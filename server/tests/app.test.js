@@ -5,14 +5,26 @@ import request from "supertest";
 import { createApp } from "../src/app.js";
 import { requirePlatformAdmin } from "../src/middleware/authenticate.js";
 import { loginSchema, platformAdminLoginSchema } from "../src/modules/auth/auth.validator.js";
-import { createOrganizationSchema } from "../src/modules/organizations/organization.validator.js";
+import {
+  createOrganizationSchema,
+  listOrganizationMembershipsQuerySchema,
+  listOrganizationsQuerySchema,
+  updateOrganizationSchema,
+  updatePlatformMembershipStatusSchema,
+} from "../src/modules/organizations/organization.validator.js";
 import { createUserSchema } from "../src/modules/users/user.validator.js";
+import {
+  listAttendanceQuerySchema,
+  recordAttendanceSchema,
+  updateClassTimetableSchema,
+} from "../src/modules/classes/class.validator.js";
 import {
   canonicalYouTubeUrl,
   createAssignmentSchema,
   submitAssignmentSchema,
 } from "../src/modules/assignments/assignment.validator.js";
 import { privateDocumentUrl } from "../src/modules/assignments/cloudinary.service.js";
+import { createLibraryItemSchema } from "../src/modules/library/library.validator.js";
 
 function makeApp() {
   return createApp({
@@ -83,6 +95,41 @@ test("assignment routes require a signed-in school member", async () => {
   await request(makeApp()).get("/api/v1/assignments").expect(401);
 });
 
+test("library routes require a signed-in school member", async () => {
+  const agent = request.agent(makeApp());
+  const csrfResponse = await agent.get("/api/v1/auth/csrf").expect(200);
+  await agent.get("/api/v1/library").expect(401);
+  await agent
+    .post("/api/v1/library")
+    .set("X-CSRF-Token", csrfResponse.body.data.csrfToken)
+    .send({})
+    .expect(401);
+});
+
+test("library validation accepts YouTube resources and rejects unsafe or incomplete entries", () => {
+  const youtube = createLibraryItemSchema.safeParse({
+    title: "Fractions explained",
+    contentType: "youtube",
+    youtubeUrl: "https://youtu.be/dQw4w9WgXcQ",
+  });
+  assert.equal(youtube.success, true);
+  assert.equal(youtube.data.youtubeUrl, "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  assert.equal(createLibraryItemSchema.safeParse({
+    title: "Untrusted embed",
+    contentType: "youtube",
+    youtubeUrl: "https://example.com/watch?v=dQw4w9WgXcQ",
+  }).success, false);
+  assert.equal(createLibraryItemSchema.safeParse({
+    title: "Missing video",
+    contentType: "youtube",
+  }).success, false);
+  assert.equal(createLibraryItemSchema.safeParse({
+    title: "An ebook",
+    contentType: "ebook",
+    youtubeUrl: "https://youtu.be/dQw4w9WgXcQ",
+  }).success, false);
+});
+
 test("assignment validation accepts each supported content format and rejects unsafe video hosts", () => {
   const base = {
     classId: "507f1f77bcf86cd799439011",
@@ -136,6 +183,97 @@ test("assignment submissions validate text, file, and link response requirements
     contentText: "My response",
     linkUrl: "https://example.com",
   }).success, false);
+});
+
+test("class timetables accept weekly Google Meet sessions and reject unsafe or invalid entries", () => {
+  const session = {
+    dayOfWeek: 1,
+    startTime: "09:00",
+    endTime: "10:00",
+    googleMeetLink: "https://meet.google.com/abc-defg-hij",
+  };
+  assert.equal(updateClassTimetableSchema.safeParse({ timetable: [session] }).success, true);
+  assert.equal(updateClassTimetableSchema.safeParse({ timetable: [] }).success, true);
+  assert.equal(updateClassTimetableSchema.safeParse({
+    timetable: [{ ...session, googleMeetLink: "https://example.com/meeting" }],
+  }).success, false);
+  assert.equal(updateClassTimetableSchema.safeParse({
+    timetable: [{ ...session, googleMeetLink: "http://meet.google.com/abc-defg-hij" }],
+  }).success, false);
+  assert.equal(updateClassTimetableSchema.safeParse({
+    timetable: [{ ...session, googleMeetLink: "https://meet.google.com" }],
+  }).success, false);
+  assert.equal(updateClassTimetableSchema.safeParse({
+    timetable: [{ ...session, googleMeetLink: "https://user:pass@meet.google.com/abc-defg-hij" }],
+  }).success, false);
+  assert.equal(updateClassTimetableSchema.safeParse({
+    timetable: [{ ...session, startTime: "10:00", endTime: "09:00" }],
+  }).success, false);
+  assert.equal(updateClassTimetableSchema.safeParse({
+    timetable: [{ ...session, dayOfWeek: 7 }],
+  }).success, false);
+});
+
+test("class timetable updates require an authenticated school member", async () => {
+  const agent = request.agent(makeApp());
+  const csrfResponse = await agent.get("/api/v1/auth/csrf").expect(200);
+  await agent
+    .patch("/api/v1/classes/507f1f77bcf86cd799439011/timetable")
+    .set("X-CSRF-Token", csrfResponse.body.data.csrfToken)
+    .send({ timetable: [] })
+    .expect(401);
+  await agent.get("/api/v1/classes/attendance").expect(401);
+  await agent
+    .post("/api/v1/classes/507f1f77bcf86cd799439011/timetable-requests")
+    .set("X-CSRF-Token", csrfResponse.body.data.csrfToken)
+    .send({ timetable: [] })
+    .expect(401);
+});
+
+test("class attendance validates session outcomes, reschedules, and date/time values", () => {
+  const session = {
+    sessionDate: "2026-10-19",
+    startTime: "09:00",
+    endTime: "10:00",
+  };
+  assert.equal(recordAttendanceSchema.safeParse({ ...session, action: "completed" }).success, true);
+  assert.equal(recordAttendanceSchema.safeParse({ ...session, action: "missed", note: "Teacher unavailable" }).success, true);
+  assert.equal(recordAttendanceSchema.safeParse({
+    ...session,
+    action: "rescheduled",
+    rescheduledDate: "2026-10-20",
+    rescheduledStartTime: "11:00",
+    rescheduledEndTime: "12:00",
+  }).success, true);
+  assert.equal(recordAttendanceSchema.safeParse({
+    ...session,
+    action: "rescheduled",
+    rescheduledDate: "2026-02-30",
+    rescheduledStartTime: "11:00",
+    rescheduledEndTime: "12:00",
+  }).success, false);
+  assert.equal(recordAttendanceSchema.safeParse({
+    ...session,
+    action: "rescheduled",
+    rescheduledDate: "2026-10-20",
+    rescheduledStartTime: "12:00",
+    rescheduledEndTime: "11:00",
+  }).success, false);
+  assert.equal(recordAttendanceSchema.safeParse({
+    ...session,
+    action: "completed",
+    endTime: "08:00",
+  }).success, false);
+  assert.equal(recordAttendanceSchema.safeParse({
+    ...session,
+    action: "cancelled",
+  }).success, false);
+  assert.equal(listAttendanceQuerySchema.safeParse({ limit: "200" }).success, true);
+  assert.equal(listAttendanceQuerySchema.safeParse({ classId: "invalid" }).success, false);
+});
+
+test("class attendance reports require an authenticated school member", async () => {
+  await request(makeApp()).get("/api/v1/classes/attendance").expect(401);
 });
 
 test("unsafe requests require a session CSRF token", async () => {
@@ -343,6 +481,41 @@ test("creating an organization is denied without an authenticated platform admin
     .send({})
     .expect(401);
   assert.equal(response.body.message, "Authentication required");
+});
+
+test("platform school management validates filters, lifecycle states, and membership actions", () => {
+  assert.equal(listOrganizationsQuerySchema.safeParse({ status: "suspended", page: "2" }).success, true);
+  assert.equal(listOrganizationsQuerySchema.safeParse({ status: "deleted" }).success, false);
+  assert.equal(listOrganizationMembershipsQuerySchema.safeParse({
+    role: "admin",
+    status: "suspended",
+    limit: "50",
+  }).success, true);
+  assert.equal(updateOrganizationSchema.safeParse({ name: "Updated school", status: "suspended" }).success, true);
+  assert.equal(updateOrganizationSchema.safeParse({}).success, false);
+  assert.equal(updatePlatformMembershipStatusSchema.safeParse({ status: "active" }).success, true);
+  assert.equal(updatePlatformMembershipStatusSchema.safeParse({ status: "deleted" }).success, false);
+});
+
+test("platform school and membership management requires platform authentication", async () => {
+  const agent = request.agent(makeApp());
+  const { body } = await agent.get("/api/v1/auth/csrf").expect(200);
+  const csrf = body.data.csrfToken;
+  const base = "/api/v1/platform/organizations/507f1f77bcf86cd799439011";
+
+  await agent.get("/api/v1/platform/organizations").expect(401);
+  await agent.get(base).expect(401);
+  await agent.get(`${base}/memberships`).expect(401);
+  await agent
+    .patch(base)
+    .set("X-CSRF-Token", csrf)
+    .send({ status: "suspended" })
+    .expect(401);
+  await agent
+    .patch(`${base}/memberships/507f1f77bcf86cd799439012/status`)
+    .set("X-CSRF-Token", csrf)
+    .send({ status: "suspended" })
+    .expect(401);
 });
 
 test("only platform-admin accounts pass platform authorization", () => {

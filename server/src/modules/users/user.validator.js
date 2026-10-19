@@ -91,5 +91,5 @@ export const listUsersQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
   search: z.string().trim().max(120).optional(),
   role: z.enum(["admin", "teacher", "student"]).optional(),
-  status: z.enum(["active", "inactive"]).optional(),
+  status: z.enum(["active", "inactive", "suspended"]).optional(),
 }).strict();

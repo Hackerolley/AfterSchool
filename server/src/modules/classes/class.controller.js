@@ -1,10 +1,103 @@
 import { Membership } from "../memberships/membership.model.js";
 import { Course } from "../courses/course.model.js";
 import { Enrollment } from "../enrollments/enrollment.model.js";
+import { ClassAttendance } from "./class-attendance.model.js";
 import { SchoolClass } from "./class.model.js";
 import { User } from "../users/user.model.js";
 import { HttpError } from "../../utils/http-error.js";
 import { paginationResult } from "../../utils/pagination.js";
+
+export async function listClassAttendance(req, res) {
+  const { page, limit, classId } = req.validatedQuery;
+  const filter = { organization: req.organization._id };
+  if (req.membership.role === "teacher") {
+    const assignedClasses = await SchoolClass.find({
+      organization: req.organization._id,
+      teacher: req.membership._id,
+      status: "active",
+    }).distinct("_id");
+    filter.class = classId
+      ? { $in: assignedClasses.filter((id) => id.toString() === classId) }
+      : { $in: assignedClasses };
+  } else if (req.membership.role === "student") {
+    const enrolledClasses = await Enrollment.find({
+      organization: req.organization._id,
+      student: req.membership._id,
+      status: "active",
+    }).distinct("class");
+    filter.class = classId
+      ? { $in: enrolledClasses.filter((id) => id.toString() === classId) }
+      : { $in: enrolledClasses };
+  } else if (classId) {
+    filter.class = classId;
+  }
+
+  let recordsQuery = ClassAttendance.find(filter).populate("class", "name");
+  if (req.membership.role !== "student") {
+    recordsQuery = recordsQuery.populate({
+      path: "markedBy",
+      select: "user",
+      populate: { path: "user", select: "firstName lastName" },
+    });
+  }
+  const [records, total] = await Promise.all([
+    recordsQuery
+      .sort({ sessionDate: -1, startTime: -1, _id: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean(),
+    ClassAttendance.countDocuments(filter),
+  ]);
+  res.json({
+    success: true,
+    data: records,
+    pagination: paginationResult(page, limit, total),
+  });
+}
+
+export async function recordClassAttendance(req, res) {
+  const schoolClass = await SchoolClass.findOne({
+    _id: req.params.classId,
+    organization: req.organization._id,
+    status: "active",
+    ...(req.membership.role === "teacher" ? { teacher: req.membership._id } : {}),
+  }).select("_id");
+  if (!schoolClass) throw new HttpError(404, "Assigned active class not found");
+
+  const { action, ...session } = req.body;
+  const update = {
+    status: action,
+    endTime: session.endTime,
+    markedBy: req.membership._id,
+    markedAt: new Date(),
+  };
+  if (session.note !== undefined) update.note = session.note;
+  if (action === "rescheduled") {
+    update.rescheduledDate = session.rescheduledDate;
+    update.rescheduledStartTime = session.rescheduledStartTime;
+    update.rescheduledEndTime = session.rescheduledEndTime;
+  }
+
+  const attendance = await ClassAttendance.findOneAndUpdate(
+    {
+      organization: req.organization._id,
+      class: schoolClass._id,
+      sessionDate: session.sessionDate,
+      startTime: session.startTime,
+    },
+    {
+      $set: update,
+      $setOnInsert: {
+        organization: req.organization._id,
+        class: schoolClass._id,
+        sessionDate: session.sessionDate,
+        startTime: session.startTime,
+      },
+    },
+    { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true },
+  );
+  res.status(200).json({ success: true, data: attendance });
+}
 
 export async function createClass(req, res) {
   const [course, teacher] = await Promise.all([
@@ -29,8 +122,80 @@ export async function createClass(req, res) {
     name: req.body.name,
     teacher: teacher._id,
     capacity: req.body.capacity,
+    timetable: req.body.timetable,
   });
   res.status(201).json({ success: true, data: schoolClass });
+}
+
+export async function updateClassTimetable(req, res) {
+  const schoolClass = await SchoolClass.findOneAndUpdate(
+    {
+      _id: req.params.classId,
+      organization: req.organization._id,
+      status: "active",
+    },
+    {
+      timetable: req.body.timetable,
+      $unset: { pendingTimetable: 1, timetableRequestedAt: 1, timetableRequestedBy: 1 },
+    },
+    { new: true, runValidators: true },
+  );
+  if (!schoolClass) throw new HttpError(404, "Active class not found");
+  res.json({ success: true, data: schoolClass });
+}
+
+export async function requestClassTimetableChange(req, res) {
+  const schoolClass = await SchoolClass.findOneAndUpdate(
+    {
+      _id: req.params.classId,
+      organization: req.organization._id,
+      teacher: req.membership._id,
+      status: "active",
+    },
+    {
+      pendingTimetable: req.body.timetable,
+      timetableRequestedAt: new Date(),
+      timetableRequestedBy: req.membership._id,
+    },
+    { new: true, runValidators: true },
+  );
+  if (!schoolClass) throw new HttpError(404, "Assigned active class not found");
+  res.json({ success: true, data: schoolClass });
+}
+
+export async function approveClassTimetableChange(req, res) {
+  const schoolClass = await SchoolClass.findOneAndUpdate(
+    {
+      _id: req.params.classId,
+      organization: req.organization._id,
+      status: "active",
+      timetableRequestedAt: { $ne: null },
+    },
+    [
+      { $set: { timetable: "$pendingTimetable" } },
+      { $unset: ["pendingTimetable", "timetableRequestedAt", "timetableRequestedBy"] },
+    ],
+    { new: true },
+  );
+  if (!schoolClass) throw new HttpError(404, "No pending timetable change for this class");
+  res.json({ success: true, data: schoolClass });
+}
+
+export async function rejectClassTimetableChange(req, res) {
+  const schoolClass = await SchoolClass.findOneAndUpdate(
+    {
+      _id: req.params.classId,
+      organization: req.organization._id,
+      status: "active",
+      timetableRequestedAt: { $ne: null },
+    },
+    {
+      $unset: { pendingTimetable: 1, timetableRequestedAt: 1, timetableRequestedBy: 1 },
+    },
+    { new: true },
+  );
+  if (!schoolClass) throw new HttpError(404, "No pending timetable change for this class");
+  res.json({ success: true, data: schoolClass });
 }
 
 function visibleClassesFilter(membership, organizationId) {
@@ -65,12 +230,24 @@ export async function listClasses(req, res) {
         select: "user",
         populate: { path: "user", select: "firstName lastName email" },
       })
+      .populate({
+        path: "timetableRequestedBy",
+        select: "user",
+        populate: { path: "user", select: "firstName lastName" },
+      })
       .sort({ createdAt: -1, _id: 1 })
       .skip((page - 1) * limit)
       .limit(limit)
       .lean(),
     SchoolClass.countDocuments(filter),
   ]);
+  if (req.membership.role === "student") {
+    for (const schoolClass of classes) {
+      delete schoolClass.pendingTimetable;
+      delete schoolClass.timetableRequestedAt;
+      delete schoolClass.timetableRequestedBy;
+    }
+  }
   res.json({
     success: true,
     data: classes,
@@ -89,6 +266,11 @@ async function getVisibleClass(req) {
       select: "user",
       populate: { path: "user", select: "firstName lastName email" },
     })
+    .populate({
+      path: "timetableRequestedBy",
+      select: "user",
+      populate: { path: "user", select: "firstName lastName" },
+    })
     .lean();
 
   if (!schoolClass) throw new HttpError(404, "Class not found");
@@ -103,6 +285,9 @@ async function getVisibleClass(req) {
       status: "active",
     });
     if (!enrolled) throw new HttpError(403, "You do not have permission");
+    delete schoolClass.pendingTimetable;
+    delete schoolClass.timetableRequestedAt;
+    delete schoolClass.timetableRequestedBy;
   }
   return schoolClass;
 }

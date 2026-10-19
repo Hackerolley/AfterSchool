@@ -1,5 +1,15 @@
 import mongoose from "mongoose";
 
+const timetableEntrySchema = new mongoose.Schema(
+  {
+    dayOfWeek: { type: Number, min: 0, max: 6, required: true },
+    startTime: { type: String, required: true, match: /^([01]\d|2[0-3]):[0-5]\d$/ },
+    endTime: { type: String, required: true, match: /^([01]\d|2[0-3]):[0-5]\d$/ },
+    googleMeetLink: { type: String, required: true, maxlength: 2048 },
+  },
+  { _id: false, strict: "throw" },
+);
+
 const classSchema = new mongoose.Schema(
   {
     organization: {
@@ -12,6 +22,10 @@ const classSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true, maxlength: 120 },
     teacher: { type: mongoose.Schema.Types.ObjectId, ref: "Membership", required: true },
     capacity: { type: Number, min: 1, max: 1000, default: 30 },
+    timetable: { type: [timetableEntrySchema], default: [] },
+    pendingTimetable: { type: [timetableEntrySchema], default: undefined },
+    timetableRequestedAt: { type: Date, default: null },
+    timetableRequestedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Membership", default: null },
     enrolledCount: { type: Number, min: 0, default: 0 },
     status: { type: String, enum: ["active", "archived"], default: "active" },
   },

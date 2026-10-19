@@ -19,7 +19,7 @@ Configuration is loaded from `server/.env` or the workspace-root `.env` (the ser
 
 The API listens on port 4000 by default. `GET /api/v1/health` reports application and MongoDB connectivity.
 
-Assignment document uploads require a Cloudinary account. Add these variables to `server/.env` (or the workspace-root `.env`, which the server also loads):
+Assignment documents and library ebooks require a Cloudinary account. Add these variables to `server/.env` (or the workspace-root `.env`, which the server also loads):
 
 ```text
 CLOUDINARY_CLOUD_NAME=your_cloud_name
@@ -27,7 +27,7 @@ CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
 ```
 
-Find the values in your Cloudinary account dashboard. Keep the API secret server-side and out of source control; `.env` files are ignored by Git. Restart the API after adding the values. Documents are uploaded as authenticated Cloudinary assets; authorized users receive a short-lived download URL. PDF, DOC, DOCX, and TXT files up to 10 MB are accepted. Text and web/YouTube link assignments do not require Cloudinary.
+Find the values in your Cloudinary account dashboard. Keep the API secret server-side and out of source control; `.env` files are ignored by Git. Restart the API after adding the values. Documents are uploaded as authenticated Cloudinary assets; authorized users receive a short-lived download URL. Assignment documents accept PDF, DOC, DOCX, and TXT files up to 10 MB; library ebooks accept PDF files up to 25 MB. Text and web/YouTube link assignments do not require Cloudinary.
 
 If startup reports a MongoDB TLS/SSL handshake error, confirm the Atlas cluster is running and its Network Access IP access list includes your current public IP. Then check whether a VPN, proxy, firewall, or managed network is interrupting TLS; retry from a trusted network if necessary. Keep TLS verification enabled.
 
@@ -57,7 +57,9 @@ PLATFORM_ADMIN_EMAIL=platform-admin@example.com
 PLATFORM_ADMIN_PASSWORD=<unique password of at least 12 characters>
 ```
 
-Remove the temporary variables after successful provisioning. A platform admin signs in at `POST /api/v1/auth/platform/login` with email and password, then can create a school and its first school admin using `POST /api/v1/platform/organizations`. The platform login endpoint uses the same CSRF/session-cookie flow as school login, but does not require an organization header.
+Remove the temporary variables after successful provisioning. A platform admin signs in at `POST /api/v1/auth/platform/login` with email and password, then can create and manage schools and memberships through `/api/v1/platform/organizations`. The platform login endpoint uses the same CSRF/session-cookie flow as school login, but does not require an organization header.
+
+Platform operators can search and paginate schools, view membership counts, edit a school's display name or sign-in slug, suspend/reactivate school access, and archive/restore a school. Memberships can be searched by member name or email and filtered by role or status; suspending or reactivating a membership changes access only in that school, not the member's global account. A school must retain at least one active administrator. School deletion is intentionally not offered: archiving blocks sign-in while preserving academic records.
 
 Example create-school JSON:
 
@@ -85,7 +87,7 @@ Organization, first admin account, and school-admin membership are created in on
 5. `GET /api/v1/auth/me` returns the active user's organization membership. `POST /api/v1/auth/logout` destroys the session.
 6. Platform operators use `POST /api/v1/auth/platform/login` and `GET /api/v1/auth/platform/me`; these routes do not use an organization context.
 
-The account is global, while school roles and active/inactive status are specific to an organization's membership. Every academic record and query is scoped by organization. A user must have an active membership in the requested organization. School roles are `admin`, `teacher`, and `student`; a separate global `platform_admin` role is assigned only by the protected CLI bootstrap.
+The account is global, while school roles and active/suspended/inactive status are specific to an organization's membership. Every academic record and query is scoped by organization. A user must have an active membership in the requested organization. School roles are `admin`, `teacher`, and `student`; a separate global `platform_admin` role is assigned only by the protected CLI bootstrap.
 
 ## API endpoints and purpose
 
@@ -110,6 +112,11 @@ Paginated list routes accept `page` (default `1`) and `limit` (default `20`, max
 | Method | Endpoint | Purpose | Access |
 |---|---|---|---|
 | POST | `/platform/organizations` | Create a school and its first school-admin account and membership in one database transaction. The request body contains `name`, `slug`, and an `admin` object with `firstName`, `lastName`, `email`, and a password of at least 12 characters. | Platform admin |
+| GET | `/platform/organizations` | Search schools by name or slug; paginate and optionally filter by `active`, `suspended`, or `inactive` status. Includes active-member/admin counts and overall status totals. | Platform admin |
+| GET | `/platform/organizations/:organizationId` | Get school details and membership counts by status. | Platform admin |
+| PATCH | `/platform/organizations/:organizationId` | Update the school `name`, sign-in `slug`, or lifecycle `status` (`active`, `suspended`, or `inactive`). `inactive` archives the school without deleting its records. | Platform admin |
+| GET | `/platform/organizations/:organizationId/memberships` | Search members by name/email; paginate and filter by `role` or membership `status` (`active`, `suspended`, or `inactive`). | Platform admin |
+| PATCH | `/platform/organizations/:organizationId/memberships/:membershipId/status` | Activate, suspend, or deactivate a membership in this school. The last active school administrator cannot be deactivated. | Platform admin |
 
 ### Users, students, and teachers
 
@@ -118,7 +125,7 @@ Paginated list routes accept `page` (default `1`) and `limit` (default `20`, max
 | GET | `/users` | List school memberships with user profiles; supports pagination, search, and `role`/`status` filters. | School admin |
 | POST | `/users` | Create a teacher or student account and its school membership/profile. Cannot create school admins. | School admin |
 | GET | `/users/:membershipId` | Get a user's membership and account profile in this school. | School admin |
-| PATCH | `/users/:membershipId/status` | Activate or deactivate this user's membership in this school; does not change the global account status. | School admin |
+| PATCH | `/users/:membershipId/status` | Activate, suspend, or deactivate this user's membership in this school; does not change the global account status. | School admin |
 | GET | `/students` | List active students with their profiles; supports pagination and search. Teachers see only students enrolled in their assigned classes. | School admin or teacher |
 | POST | `/students` | Create a student account and school-specific profile. Optional profile fields: `dateOfBirth` (`YYYY-MM-DD`), `gender` (`female`, `male`, `non_binary`, `self_described`, or `prefer_not_to_say`), `genderDescription` (required for `self_described`), `countryOfResidence` and `homeCountry` (two-letter ISO 3166-1 alpha-2 codes), `phoneNumber`, `studentNumber`, and guardian contact details. | School admin |
 | GET | `/students/:membershipId` | Get a student's profile. Teachers must be assigned to a class containing the student; students can retrieve only their own profile. | School admin, assigned teacher, or that student |
@@ -135,13 +142,23 @@ Paginated list routes accept `page` (default `1`) and `limit` (default `20`, max
 | POST | `/courses` | Create a course with a name, code, and optional description. Course codes must be unique within the school. | School admin |
 | GET | `/courses/:courseId` | Get a course. Teachers must be assigned to one of its classes; students must be enrolled in one of its classes. | School admin, assigned teacher, or enrolled student |
 | GET | `/classes` | List classes with course and teacher information; supports pagination, search, and status filters. Teachers see their assigned classes; students see their active enrollments. | Active school member |
-| POST | `/classes` | Create a class for an active course and assign an active teacher from this same school; accepts an optional capacity. | School admin |
+| POST | `/classes` | Create a class for an active course and assign an active teacher from this same school; accepts an optional capacity and weekly timetable. | School admin |
+| PATCH | `/classes/:classId/timetable` | Replace a class's weekly timetable. Each session has `dayOfWeek` (`0` Sunday through `6` Saturday), 24-hour `startTime` and `endTime`, and an HTTPS `googleMeetLink` on `meet.google.com`. | School admin |
+| POST | `/classes/:classId/timetable-requests` | Submit a proposed replacement timetable. The approved schedule remains active until an admin reviews it. | Teacher assigned to class |
+| POST | `/classes/:classId/timetable-requests/approve` | Publish the class's pending teacher timetable proposal. | School admin |
+| POST | `/classes/:classId/timetable-requests/reject` | Reject and clear the class's pending teacher timetable proposal. | School admin |
+| GET | `/classes/attendance` | List recent class-session attendance records; teachers see assigned classes, students see actively enrolled classes, and admins see the school. Supports pagination and an optional `classId`. | School admin, teacher, or student |
+| POST | `/classes/:classId/attendance` | Record a session as `completed`, `missed`, or `rescheduled`. Each record is keyed to one class occurrence by its date and start time. Reschedules also record the replacement date and time without changing the recurring timetable. | School admin or assigned teacher |
 | GET | `/classes/:classId` | Get class details. Teachers must be assigned to the class; students must be actively enrolled in it. | School admin, assigned teacher, or enrolled student |
 | GET | `/classes/:classId/students` | List active enrollments and student profiles in a class; supports pagination. A student can retrieve only their own enrollment. | School admin, assigned teacher, or that class's student |
 | POST | `/classes/:classId/enrollments` | Enroll an active student in an active class. Reserves capacity atomically and rejects a full class or duplicate enrollment. | School admin |
 | DELETE | `/classes/:classId/enrollments/:enrollmentId` | Withdraw an active student enrollment while keeping the enrollment record as history and releasing class capacity. | School admin |
 
 Class capacity is reserved atomically when enrolling; withdrawn enrollments remain as history and cannot be re-created for the same student/class pair. User and list responses do not include password hashes or passwords.
+
+Class timetables are recurring weekly sessions and are included in class list/detail responses. Teachers see schedules and pending proposals for classes assigned to them, and students see only the approved schedules for classes they are actively enrolled in.
+
+Attendance is recorded per scheduled class occurrence, not per student. Each occurrence keeps its date, time, outcome, recording staff member, timestamp, and optional note; rescheduled sessions additionally retain their replacement date and time. Teachers can update attendance for their assigned classes, school admins can update any class in their organization, and students can read reports only for classes in which they are actively enrolled.
 
 ### Assignments and submissions
 
@@ -154,6 +171,18 @@ Class capacity is reserved atomically when enrolling; withdrawn enrollments rema
 | POST | `/assignments/:assignmentId/submissions` | Submit or update a response as text, a PDF/Word/TXT document, or an HTTP(S) link. Late work is accepted and marked as late. Multipart form data is used for file submissions. | Student actively enrolled in the assignment's class |
 | GET | `/assignments/:assignmentId/submissions` | List student submissions for the assignment, including student names and submission details. | Teacher who created the assignment |
 | GET | `/assignments/:assignmentId/submissions/:submissionId/file` | Redirect to a short-lived, signed download for a student's submitted document. | School admin, assigned teacher, or that student |
+
+### School library
+
+| Method | Endpoint | Purpose | Access |
+|---|---|---|---|
+| GET | `/library` | List published ebooks and YouTube videos shared with the school. | Active school member |
+| POST | `/library` | Add an ebook PDF (multipart form with `file`) or a YouTube video (`youtubeUrl`), with a title and optional description. | School admin |
+| PATCH | `/library/:itemId` | Update a resource; ebook uploads can replace the current PDF. | School admin |
+| DELETE | `/library/:itemId` | Remove a resource and its stored ebook file. | School admin |
+| GET | `/library/:itemId/file` | Redirect to a short-lived, authenticated ebook download. Browser requests pass the school ID as the `organizationId` query parameter; membership is still checked. | Active school member |
+
+Library PDFs are stored as private authenticated Cloudinary assets. YouTube links are validated and embedded using YouTube's privacy-enhanced player. Library items and downloads are scoped to the selected school.
 
 Assignment and submission documents are stored in Cloudinary using authenticated delivery. For YouTube assignments, the client accepts YouTube video URLs and embeds them with YouTube's privacy-enhanced `youtube-nocookie.com` player; no separate embed provider is needed.
 

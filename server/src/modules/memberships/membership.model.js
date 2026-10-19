@@ -13,7 +13,7 @@ const membershipSchema = new mongoose.Schema(
       required: true,
     },
     role: { type: String, enum: ["admin", "teacher", "student"], required: true },
-    status: { type: String, enum: ["active", "inactive"], default: "active" },
+    status: { type: String, enum: ["active", "inactive", "suspended"], default: "active" },
   },
   { timestamps: true, strict: "throw" },
 );

@@ -107,11 +107,19 @@ export function apiPostForm(path, body, organizationId) {
   return request(path, { method: "POST", body, organizationId, csrfToken: csrfToken() });
 }
 
+export function apiPatchForm(path, body, organizationId) {
+  return request(path, { method: "PATCH", body, organizationId, csrfToken: csrfToken() });
+}
+
 export function assignmentFileUrl(assignmentId, organizationId, submissionId) {
   const path = submissionId
     ? `/assignments/${assignmentId}/submissions/${submissionId}/file`
     : `/assignments/${assignmentId}/file`;
   return `${API_URL}${path}?organizationId=${encodeURIComponent(organizationId)}`;
+}
+
+export function libraryEbookUrl(itemId, organizationId) {
+  return `${API_URL}/library/${itemId}/file?organizationId=${encodeURIComponent(organizationId)}`;
 }
 
 export function apiPatch(path, body, organizationId) {

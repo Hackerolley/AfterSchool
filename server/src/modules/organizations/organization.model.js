@@ -11,7 +11,7 @@ const organizationSchema = new mongoose.Schema(
       match: /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
       maxlength: 80,
     },
-    status: { type: String, enum: ["active", "inactive"], default: "active" },
+    status: { type: String, enum: ["active", "suspended", "inactive"], default: "active" },
   },
   { timestamps: true, strict: "throw" },
 );
