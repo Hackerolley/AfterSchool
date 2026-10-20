@@ -1092,6 +1092,141 @@ body { color: #28263d; background: #f2f0f8; }
 .input-wrap:focus-within, .plain-input:focus { border-color: #887adf; box-shadow: 0 0 0 3px #7062e024; }
 .modal { border-color: #ffffffc9; background: rgba(255,255,255,.93); box-shadow: 0 30px 90px #21183d30, inset 0 1px 0 #fff; backdrop-filter: blur(24px); }
 .modal-backdrop { background: rgba(31, 26, 48, .46); backdrop-filter: blur(8px); }
+.avatar img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
+.school-logo { object-fit: cover; background: #fff; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.settings-backdrop { z-index: 50; }
+.settings-modal { width: min(100%, 600px); padding: 27px; }
+.settings-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding-bottom: 20px; border-bottom: 1px solid var(--line); }
+.settings-heading h2 { margin: 4px 0 5px; color: var(--ink); font: 700 27px/1.15 var(--font-display); letter-spacing: -.7px; }
+.settings-heading .muted { margin: 0; font-size: 12px; }
+.settings-list { display: grid; }
+.settings-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 19px 0; border-bottom: 1px solid var(--line); }
+.settings-identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.settings-identity > div:last-child { display: grid; gap: 4px; }
+.settings-identity strong { color: var(--ink); font-size: 12px; }
+.settings-identity span { color: var(--muted); font-size: 10px; line-height: 1.5; }
+.settings-avatar { width: 44px; height: 44px; font-size: 12px; }
+.settings-school-logo, .settings-logo-fallback, .settings-theme-icon { display: grid; place-items: center; flex: 0 0 auto; width: 42px; height: 42px; border: 1px solid var(--line); border-radius: 11px; object-fit: cover; color: #6557c4; background: #f0eefb; font-weight: 700; }
+.settings-actions { display: flex; align-items: center; gap: 6px; }
+.settings-actions .button { white-space: nowrap; }
+.settings-theme-icon { color: #6255c7; }
+.theme-switch { position: relative; width: 43px; height: 25px; padding: 3px; border: 0; border-radius: 20px; background: #c9cad2; cursor: pointer; transition: background .18s ease; }
+.theme-switch > span { display: block; width: 19px; height: 19px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px #16152b30; transition: transform .18s ease; }
+.theme-switch.is-on { background: #6457c8; }
+.theme-switch.is-on > span { transform: translateX(18px); }
+.settings-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 19px; color: var(--muted); font-size: 10px; }
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #f0edf8;
+  --muted: #aaa5b8;
+  --line: #3b354d;
+  --paper: #262237;
+  --canvas: #1a1726;
+  background: var(--canvas);
+}
+html[data-theme="dark"] body { color: var(--ink); background: var(--canvas); }
+html[data-theme="dark"] .dashboard-layout { background: var(--canvas); }
+html[data-theme="dark"] .sidebar { border-color: #342e45; background: #211d31; }
+html[data-theme="dark"] .term-card { background: #2a253b; }
+html[data-theme="dark"] .term-card strong,
+html[data-theme="dark"] .sidebar-user-copy strong { color: #e6e1f1; }
+html[data-theme="dark"] .sidebar-user { border-color: #39334a; }
+html[data-theme="dark"] .main-panel,
+html[data-theme="dark"] .dashboard-content { color: var(--ink); }
+html[data-theme="dark"] .topbar { border-color: #39334a; background: #201c2df0; }
+html[data-theme="dark"] .breadcrumbs strong,
+html[data-theme="dark"] .welcome-row h1 { color: #f0edf8; }
+html[data-theme="dark"] .metric-card,
+html[data-theme="dark"] .platform-stat,
+html[data-theme="dark"] .platform-section,
+html[data-theme="dark"] .platform-school-row,
+html[data-theme="dark"] .class-card,
+html[data-theme="dark"] .content-card,
+html[data-theme="dark"] .panel,
+html[data-theme="dark"] .library-card,
+html[data-theme="dark"] .assignment-card { border-color: #3b354d; color: #eeeaf6; background: #262237; }
+html[data-theme="dark"] .school-picker { border-color: #403951; background: #2b263d; }
+html[data-theme="dark"] .school-picker-copy strong,
+html[data-theme="dark"] .metric-value,
+html[data-theme="dark"] .platform-section-heading h2,
+html[data-theme="dark"] .platform-school-info strong { color: #eeeaf6; }
+html[data-theme="dark"] .metric-top,
+html[data-theme="dark"] .platform-school-info small { color: #aaa5b8; }
+html[data-theme="dark"] .course-list,
+html[data-theme="dark"] .people-list,
+html[data-theme="dark"] .details-roster { border-color: #3b354d; background: #262237; }
+html[data-theme="dark"] .course-row,
+html[data-theme="dark"] .person-row,
+html[data-theme="dark"] .attendance-history-row,
+html[data-theme="dark"] .platform-member-row,
+html[data-theme="dark"] .details-roster-row { border-color: #3b354d; }
+html[data-theme="dark"] .course-main h3,
+html[data-theme="dark"] .person-info strong,
+html[data-theme="dark"] .assignment-card-heading h3,
+html[data-theme="dark"] .library-card-body h3,
+html[data-theme="dark"] .panel h3,
+html[data-theme="dark"] .details-roster-row .person-info strong { color: #eeeaf6; }
+html[data-theme="dark"] .course-main p,
+html[data-theme="dark"] .person-info small,
+html[data-theme="dark"] .assignment-card-copy > p,
+html[data-theme="dark"] .assignment-card-copy > small,
+html[data-theme="dark"] .library-card-body > p,
+html[data-theme="dark"] .attendance-history-empty { color: #aaa5b8; }
+html[data-theme="dark"] .inline-hint,
+html[data-theme="dark"] .detail-item,
+html[data-theme="dark"] .assignment-material,
+html[data-theme="dark"] .assignment-file-link,
+html[data-theme="dark"] .assignment-resource-link,
+html[data-theme="dark"] .quran-shortcuts button { border-color: #3b354d; color: #e9e5f2; background: #262237; }
+html[data-theme="dark"] .inline-hint strong,
+html[data-theme="dark"] .detail-item > strong,
+html[data-theme="dark"] .quran-shortcuts strong,
+html[data-theme="dark"] .quran-progress-copy strong,
+html[data-theme="dark"] .quran-mini-stats strong,
+html[data-theme="dark"] .quran-plan-task strong,
+html[data-theme="dark"] .quran-activity-row strong { color: #eeeaf6; }
+html[data-theme="dark"] .quick-links button { border-color: #3b354d; }
+html[data-theme="dark"] .quick-links button strong { color: #eeeaf6; }
+html[data-theme="dark"] .quick-links button small,
+html[data-theme="dark"] .quran-shortcuts small,
+html[data-theme="dark"] .quran-progress-copy > span,
+html[data-theme="dark"] .quran-mini-stats small,
+html[data-theme="dark"] .quran-plan-task small,
+html[data-theme="dark"] .quran-activity-row small { color: #aaa5b8; }
+html[data-theme="dark"] .quran-verse { background: linear-gradient(145deg, #2c2740, #28233a 55%, #242033); }
+html[data-theme="dark"] .quran-arabic { color: #f0edf8; }
+html[data-theme="dark"] .quran-translation { color: #c7c1d3; }
+html[data-theme="dark"] .quran-progress-ring { background: conic-gradient(#9285ef var(--quran-progress), #454057 0); }
+html[data-theme="dark"] .nav-item { color: #c0bbce; }
+html[data-theme="dark"] .nav-item:hover { color: #f1edfa; background: #ffffff0c; }
+html[data-theme="dark"] .icon-button:hover,
+html[data-theme="dark"] .button-quiet { color: #ddd7ed; background: #342e46; }
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea,
+html[data-theme="dark"] .search-control,
+html[data-theme="dark"] .plain-input,
+html[data-theme="dark"] .input-wrap { border-color: #484158; color: #eeeaf6; background-color: #211d30; }
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder { color: #928ba4; }
+html[data-theme="dark"] .modal { border-color: #49425a; color: #eeeaf6; background: rgba(37, 33, 53, .97); }
+html[data-theme="dark"] .modal h2,
+html[data-theme="dark"] .settings-heading h2,
+html[data-theme="dark"] .settings-identity strong { color: #f0edf8; }
+html[data-theme="dark"] .settings-heading,
+html[data-theme="dark"] .settings-row { border-color: #413a53; }
+html[data-theme="dark"] .quran-panel,
+html[data-theme="dark"] .quran-verse { border-color: #403951; color: #eeeaf6; background: #28233a; }
+html[data-theme="dark"] .quran-verse p,
+html[data-theme="dark"] .quran-panel h2 { color: #eeeaf6; }
+html[data-theme="dark"] .login-side { background: #1a1726; }
+html[data-theme="dark"] .login-box { border-color: #3b354d; color: #eeeaf6; background: #262237dd; }
+html[data-theme="dark"] .login-heading h2,
+html[data-theme="dark"] .field > span { color: #f0edf8; }
+html[data-theme="dark"] .login-switch { border-color: #3b354d; background: #211d30; }
+html[data-theme="dark"] .login-switch button.selected { color: #f0edf8; background: #3a344f; }
 
 @media (max-width: 850px) {
   .sidebar { box-shadow: 18px 0 45px rgba(20, 16, 39, .26); }
@@ -1102,4 +1237,7 @@ body { color: #28263d; background: #f2f0f8; }
   .quran-welcome h1 { font-size: 33px; }
   .login-box { padding: 30px 20px; border-radius: 19px; }
   .login-heading h2 { font-size: 37px; }
+  .settings-modal { padding: 18px; }
+  .settings-row { align-items: flex-start; }
+  .settings-actions { flex-wrap: wrap; justify-content: flex-end; }
 }

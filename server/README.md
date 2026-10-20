@@ -27,7 +27,7 @@ CLOUDINARY_API_KEY=your_api_key
 CLOUDINARY_API_SECRET=your_api_secret
 ```
 
-Find the values in your Cloudinary account dashboard. Keep the API secret server-side and out of source control; `.env` files are ignored by Git. Restart the API after adding the values. Documents are uploaded as authenticated Cloudinary assets; authorized users receive a short-lived download URL. Assignment documents accept PDF, DOC, DOCX, and TXT files up to 10 MB; library ebooks accept PDF files up to 25 MB. Text and web/YouTube link assignments do not require Cloudinary.
+Find the values in your Cloudinary account dashboard. Keep the API secret server-side and out of source control; `.env` files are ignored by Git. Restart the API after adding the values. Documents are uploaded as authenticated Cloudinary assets; authorized users receive a short-lived download URL. Assignment documents accept PDF, DOC, DOCX, and TXT files up to 10 MB; library ebooks accept PDF files up to 25 MB. Profile photos and school logos use the same Cloudinary credentials and accept JPG, PNG, or WebP images up to 5 MB. Text and web/YouTube link assignments do not require Cloudinary.
 
 Student Quran Learning uses the Quran Foundation Content API for chapter text, translations, recitations, and audio. Add the credentials from the Quran Foundation Developer Console to the Render backend environment (or `server/.env` locally):
 
@@ -118,6 +118,19 @@ Paginated list routes accept `page` (default `1`) and `limit` (default `20`, max
 | GET | `/auth/me` | Get the signed-in user's profile and role in the selected school. | Active member of selected school |
 | GET | `/auth/platform/me` | Get the signed-in platform administrator's profile. | Platform admin |
 | POST | `/auth/logout` | Destroy the current session and clear its cookie. | Authenticated |
+
+### Settings
+
+| Method | Endpoint | Purpose | Access |
+|---|---|---|---|
+| GET | `/settings/profile` | Get the signed-in user's profile settings. | Authenticated |
+| POST | `/settings/profile/avatar` | Upload or replace a profile photo using multipart form data with a `file` field. | Authenticated |
+| DELETE | `/settings/profile/avatar` | Remove the signed-in user's profile photo. | Authenticated |
+| GET | `/settings/school` | Get the selected school's name, slug, and logo URL. | Active school member |
+| POST | `/settings/school/logo` | Upload or replace the selected school's logo using multipart form data with a `file` field. | School admin |
+| DELETE | `/settings/school/logo` | Remove the selected school's logo. | School admin |
+
+Night-mode preference is stored locally in the browser and applies across school and platform dashboards.
 
 ### Platform school management
 

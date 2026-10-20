@@ -4,7 +4,7 @@ import { HttpError } from "../../utils/http-error.js";
 
 let configured = false;
 
-function getCloudinary(config) {
+export function getCloudinary(config) {
   if (!config.CLOUDINARY_CLOUD_NAME || !config.CLOUDINARY_API_KEY || !config.CLOUDINARY_API_SECRET) {
     throw new HttpError(503, "Document uploads are not configured. Set the Cloudinary server credentials.");
   }
@@ -18,6 +18,40 @@ function getCloudinary(config) {
     configured = true;
   }
   return cloudinary;
+}
+
+export async function uploadImage(file, folder, config) {
+  const client = getCloudinary(config);
+  const upload = new Promise((resolve, reject) => {
+    const stream = client.uploader.upload_stream(
+      {
+        resource_type: "image",
+        folder: `afterschool/${folder}`,
+        use_filename: false,
+        unique_filename: true,
+        overwrite: false,
+      },
+      (error, result) => (error ? reject(error) : resolve(result)),
+    );
+    Readable.from(file.buffer).pipe(stream);
+  });
+  try {
+    const asset = await upload;
+    return { publicId: asset.public_id, url: asset.secure_url };
+  } catch (error) {
+    console.error("Cloudinary settings image upload failed:", error.message);
+    throw new HttpError(502, "The image could not be stored. Please try again.");
+  }
+}
+
+export async function deleteImage(publicId, config) {
+  if (!publicId) return;
+  const client = getCloudinary(config);
+  try {
+    await client.uploader.destroy(publicId, { resource_type: "image", invalidate: true });
+  } catch (error) {
+    console.error("Cloudinary settings image cleanup failed:", error.message);
+  }
 }
 
 export async function uploadDocument(file, organizationId, config) {

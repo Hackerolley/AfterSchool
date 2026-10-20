@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   Archive,
@@ -18,6 +18,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Moon,
   PauseCircle,
   Pencil,
   Plus,
@@ -30,6 +31,9 @@ import {
   Users,
   Video,
   X,
+  Sun,
+  Trash2,
+  Upload,
 } from "lucide-react";
 import AssignmentPage from "./AssignmentPage.jsx";
 import LibraryPage from "./LibraryPage.jsx";
@@ -38,6 +42,8 @@ import {
   apiGet,
   apiPatch,
   apiPost,
+  apiPostForm,
+  apiDelete,
   getPlatformSession,
   getSchoolSession,
   login,
@@ -46,6 +52,7 @@ import {
 
 const SCHOOL_KEY = "afterschool.school";
 const MODE_KEY = "afterschool.mode";
+const THEME_KEY = "afterschool.theme";
 const roleNames = { admin: "School admin", teacher: "Teacher", student: "Student" };
 const navigation = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -87,6 +94,12 @@ function initials(user) {
 function App() {
   const [auth, setAuth] = useState(null);
   const [checkingSession, setCheckingSession] = useState(true);
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem(THEME_KEY) === "dark");
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = darkMode ? "dark" : "light";
+    localStorage.setItem(THEME_KEY, darkMode ? "dark" : "light");
+  }, [darkMode]);
 
   useEffect(() => {
     const handleUnauthorized = () => {
@@ -106,7 +119,11 @@ function App() {
     const restore = mode === "platform"
       ? getPlatformSession()
       : school?.id
-        ? getSchoolSession(school.id).then((payload) => ({ ...payload.data, mode: "school", school }))
+        ? getSchoolSession(school.id).then((payload) => {
+          const restoredSchool = { ...school, ...payload.data.organization, id: school.id };
+          localStorage.setItem(SCHOOL_KEY, JSON.stringify(restoredSchool));
+          return { ...payload.data, mode: "school", school: restoredSchool };
+        })
         : Promise.reject(new Error("No school session"));
 
     restore
@@ -136,6 +153,7 @@ function App() {
         id: data.organization.id,
         slug: data.organization.slug,
         name: data.organization.name,
+        logoUrl: data.organization.logoUrl || "",
       };
       localStorage.setItem(SCHOOL_KEY, JSON.stringify(school));
       nextAuth.school = school;
@@ -161,9 +179,9 @@ function App() {
     return <LoginScreen onLogin={handleLogin} />;
   }
   if (auth.mode === "platform") {
-    return <PlatformDashboard auth={auth} onLogout={handleLogout} />;
+    return <PlatformDashboard auth={auth} onAuthChange={setAuth} darkMode={darkMode} onToggleTheme={() => setDarkMode((value) => !value)} onLogout={handleLogout} />;
   }
-  return <SchoolDashboard auth={auth} onLogout={handleLogout} />;
+  return <SchoolDashboard auth={auth} onAuthChange={setAuth} darkMode={darkMode} onToggleTheme={() => setDarkMode((value) => !value)} onLogout={handleLogout} />;
 }
 
 function LoadingScreen() {
@@ -173,6 +191,112 @@ function LoadingScreen() {
       <div className="loading-line" />
       <p>Getting your school ready…</p>
     </main>
+  );
+}
+
+function Avatar({ user, className }) {
+  return (
+    <div className={className} title={fullName(user)}>
+      {user?.avatarUrl ? <img src={user.avatarUrl} alt="" /> : initials(user)}
+    </div>
+  );
+}
+
+function SettingsDialog({ auth, onAuthChange, darkMode, onToggleTheme, organizationId, onClose }) {
+  const avatarInput = useRef(null);
+  const logoInput = useRef(null);
+  const [saving, setSaving] = useState("");
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const canManageLogo = auth.mode === "school" && auth.role === "admin";
+
+  async function uploadImage(kind, file) {
+    if (!file) return;
+    setSaving(kind);
+    setError("");
+    setNotice("");
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const endpoint = kind === "avatar" ? "/settings/profile/avatar" : "/settings/school/logo";
+      const response = await apiPostForm(endpoint, form, kind === "logo" ? organizationId : undefined);
+      if (kind === "avatar") {
+        onAuthChange((current) => ({ ...current, user: { ...current.user, avatarUrl: response.data.avatarUrl } }));
+      } else {
+        onAuthChange((current) => {
+          const school = { ...current.school, logoUrl: response.data.logoUrl };
+          localStorage.setItem(SCHOOL_KEY, JSON.stringify(school));
+          return { ...current, school };
+        });
+      }
+      setNotice(kind === "avatar" ? "Profile photo updated." : "School logo updated.");
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSaving("");
+      if (kind === "avatar" && avatarInput.current) avatarInput.current.value = "";
+      if (kind === "logo" && logoInput.current) logoInput.current.value = "";
+    }
+  }
+
+  async function removeImage(kind) {
+    setSaving(kind);
+    setError("");
+    setNotice("");
+    try {
+      const endpoint = kind === "avatar" ? "/settings/profile/avatar" : "/settings/school/logo";
+      const response = await apiDelete(endpoint, kind === "logo" ? organizationId : undefined);
+      if (kind === "avatar") {
+        onAuthChange((current) => ({ ...current, user: { ...current.user, avatarUrl: response.data.avatarUrl } }));
+      } else {
+        onAuthChange((current) => {
+          const school = { ...current.school, logoUrl: response.data.logoUrl };
+          localStorage.setItem(SCHOOL_KEY, JSON.stringify(school));
+          return { ...current, school };
+        });
+      }
+      setNotice(kind === "avatar" ? "Profile photo removed." : "School logo removed.");
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSaving("");
+    }
+  }
+
+  return (
+    <div className="modal-backdrop settings-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <section className="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <header className="settings-heading">
+          <div><p className="eyebrow">PREFERENCES</p><h2 id="settings-title">Settings</h2><p className="muted">Personalize your Afterschool workspace.</p></div>
+          <button className="icon-button" aria-label="Close settings" onClick={onClose}><X size={18} /></button>
+        </header>
+        {error && <div className="error-banner" role="alert">{error}</div>}
+        {notice && <div className="notice-banner" role="status"><Check size={16} />{notice}</div>}
+        <div className="settings-list">
+          <section className="settings-row">
+            <div className="settings-identity"><Avatar user={auth.user} className="avatar settings-avatar" /><div><strong>Profile photo</strong><span>JPG, PNG, or WebP · up to 5 MB</span></div></div>
+            <div className="settings-actions">
+              <input ref={avatarInput} className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => uploadImage("avatar", event.target.files?.[0])} />
+              <button className="button button-small" onClick={() => avatarInput.current?.click()} disabled={saving !== ""}><Upload size={15} />{saving === "avatar" ? "Uploading…" : "Upload"}</button>
+              {auth.user?.avatarUrl && <button className="icon-button" title="Remove profile photo" aria-label="Remove profile photo" disabled={saving !== ""} onClick={() => removeImage("avatar")}><Trash2 size={16} /></button>}
+            </div>
+          </section>
+          {auth.mode === "school" && <section className="settings-row">
+            <div className="settings-identity">{auth.school.logoUrl ? <img className="settings-school-logo" src={auth.school.logoUrl} alt="" /> : <div className="settings-school-logo settings-logo-fallback">{auth.school.name?.[0] || "S"}</div>}<div><strong>School logo</strong><span>{canManageLogo ? "Shown in the school workspace · JPG, PNG, or WebP" : "Managed by your school administrator"}</span></div></div>
+            {canManageLogo && <div className="settings-actions">
+              <input ref={logoInput} className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => uploadImage("logo", event.target.files?.[0])} />
+              <button className="button button-small" onClick={() => logoInput.current?.click()} disabled={saving !== ""}><Upload size={15} />{saving === "logo" ? "Uploading…" : "Upload"}</button>
+              {auth.school.logoUrl && <button className="icon-button" title="Remove school logo" aria-label="Remove school logo" disabled={saving !== ""} onClick={() => removeImage("logo")}><Trash2 size={16} /></button>}
+            </div>}
+          </section>}
+          <section className="settings-row">
+            <div className="settings-identity"><span className="settings-theme-icon">{darkMode ? <Moon size={18} /> : <Sun size={18} />}</span><div><strong>Night mode</strong><span>Use a darker appearance on this device</span></div></div>
+            <button className={`theme-switch ${darkMode ? "is-on" : ""}`} type="button" role="switch" aria-checked={darkMode} aria-label="Night mode" onClick={onToggleTheme}><span /></button>
+          </section>
+        </div>
+        <footer className="settings-footer"><span>{fullName(auth.user)} · {auth.mode === "platform" ? "Platform admin" : roleNames[auth.role]}</span><button className="button button-primary button-small" onClick={onClose}>Done</button></footer>
+      </section>
+    </div>
   );
 }
 
@@ -275,7 +399,7 @@ function LoginScreen({ onLogin }) {
   );
 }
 
-function SchoolDashboard({ auth, onLogout }) {
+function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout }) {
   const [activePage, setActivePage] = useState("overview");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -288,6 +412,7 @@ function SchoolDashboard({ auth, onLogout }) {
   const [search, setSearch] = useState("");
   const [details, setDetails] = useState(null);
   const [attendanceDialog, setAttendanceDialog] = useState(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const role = auth.role;
   const orgId = auth.school.id;
   const person = auth.user;
@@ -421,7 +546,7 @@ function SchoolDashboard({ auth, onLogout }) {
     <div className="dashboard-layout">
       <aside className={`sidebar ${mobileNavOpen ? "sidebar-open" : ""}`}>
         <div className="sidebar-brand"><Brand /><button className="icon-button sidebar-close" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)}><X size={18} /></button></div>
-        <div className="school-picker"><div className="school-monogram">{auth.school.name?.[0] || "S"}</div><div className="school-picker-copy"><strong>{auth.school.name}</strong><span>School workspace</span></div><ChevronDown size={15} /></div>
+        <div className="school-picker">{auth.school.logoUrl ? <img className="school-monogram school-logo" src={auth.school.logoUrl} alt="" /> : <div className="school-monogram">{auth.school.name?.[0] || "S"}</div>}<div className="school-picker-copy"><strong>{auth.school.name}</strong><span>School workspace</span></div><ChevronDown size={15} /></div>
         <p className="nav-label">WORKSPACE</p>
         <nav className="side-nav" aria-label="Main navigation">
           {availableNavigation.map(({ id, label, icon: Icon }) => (
@@ -432,9 +557,9 @@ function SchoolDashboard({ auth, onLogout }) {
         </nav>
         <div className="sidebar-bottom">
           <div className="term-card"><span className="term-badge"><Activity size={14} /> SCHOOL YEAR</span><strong>Learning in progress</strong><span>Small steps make big things.</span><div className="term-progress"><i /></div></div>
-          <button className="nav-item settings-item" onClick={() => showNotice("School settings are coming soon.")}><Settings2 size={18} /><span>Settings</span></button>
+          <button className="nav-item settings-item" onClick={() => setSettingsOpen(true)}><Settings2 size={18} /><span>Settings</span></button>
           <div className="sidebar-user">
-            <div className="avatar avatar-dark">{initials(person)}</div>
+            <Avatar user={person} className="avatar avatar-dark" />
             <div className="sidebar-user-copy"><strong>{fullName(person)}</strong><span>{roleNames[role]}</span></div>
             <button className="icon-button logout-icon" title="Sign out" aria-label="Sign out" onClick={onLogout}><LogOut size={17} /></button>
           </div>
@@ -446,7 +571,7 @@ function SchoolDashboard({ auth, onLogout }) {
         <header className="topbar">
           <button className="icon-button menu-button" aria-label="Open navigation" onClick={() => setMobileNavOpen(true)}><Menu size={20} /></button>
           <div className="breadcrumbs"><span>Workspace</span><span className="crumb-divider">/</span><strong>{availableNavigation.find((item) => item.id === activePage)?.label}</strong></div>
-          <div className="topbar-right"><span className="date-label"><CalendarDays size={15} />{dayLabel}</span><span className="topbar-separator" /><div className="avatar avatar-soft" title={fullName(person)}>{initials(person)}</div><button className="icon-button top-logout" title="Sign out" aria-label="Sign out" onClick={onLogout}><LogOut size={17} /></button></div>
+          <div className="topbar-right"><span className="date-label"><CalendarDays size={15} />{dayLabel}</span><span className="topbar-separator" /><Avatar user={person} className="avatar avatar-soft" /><button className="icon-button top-logout" title="Sign out" aria-label="Sign out" onClick={onLogout}><LogOut size={17} /></button></div>
         </header>
 
         <div className="dashboard-content">
@@ -472,6 +597,7 @@ function SchoolDashboard({ auth, onLogout }) {
       {dialog && <ActionDialog type={dialog} initialClassId={dialogClassId} courses={data.courses} teachers={data.teachers} students={data.students} classes={data.classes} onClose={() => setDialog("")} onSubmit={submitCreate} />}
       {attendanceDialog && <AttendanceDialog session={attendanceDialog} onClose={() => setAttendanceDialog(null)} onSubmit={saveAttendance} />}
       {details && <DetailsDialog details={details} organizationId={orgId} onClose={() => setDetails(null)} />}
+      {settingsOpen && <SettingsDialog auth={auth} onAuthChange={onAuthChange} darkMode={darkMode} onToggleTheme={onToggleTheme} organizationId={orgId} onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }
@@ -885,8 +1011,9 @@ function PeoplePage({ role, data, loading, onCreate, onOpenPerson, search, setSe
   );
 }
 
-function PlatformDashboard({ auth, onLogout }) {
+function PlatformDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout }) {
   const [dialog, setDialog] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [editingOrganization, setEditingOrganization] = useState(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -1051,10 +1178,10 @@ function PlatformDashboard({ auth, onLogout }) {
         <div className="platform-tag"><ShieldCheck size={15} /> PLATFORM CONSOLE</div>
         <p className="nav-label">MANAGE</p>
         <nav className="side-nav"><button className="nav-item nav-active"><Building2 size={18} /><span>Schools & memberships</span></button></nav>
-        <div className="sidebar-bottom"><div className="sidebar-user"><div className="avatar avatar-dark">{initials(auth.user)}</div><div className="sidebar-user-copy"><strong>{fullName(auth.user)}</strong><span>Platform admin</span></div><button className="icon-button logout-icon" title="Sign out" aria-label="Sign out" onClick={onLogout}><LogOut size={17} /></button></div></div>
+        <div className="sidebar-bottom"><button className="nav-item settings-item" onClick={() => setSettingsOpen(true)}><Settings2 size={18} /><span>Settings</span></button><div className="sidebar-user"><Avatar user={auth.user} className="avatar avatar-dark" /><div className="sidebar-user-copy"><strong>{fullName(auth.user)}</strong><span>Platform admin</span></div><button className="icon-button logout-icon" title="Sign out" aria-label="Sign out" onClick={onLogout}><LogOut size={17} /></button></div></div>
       </aside>
       <main className="main-panel">
-        <header className="topbar"><div className="breadcrumbs"><span>Platform</span><span className="crumb-divider">/</span><strong>School management</strong></div><div className="topbar-right"><span className="platform-user-label"><span className="live-dot" />Platform access</span><span className="topbar-separator" /><div className="avatar avatar-soft">{initials(auth.user)}</div></div></header>
+        <header className="topbar"><div className="breadcrumbs"><span>Platform</span><span className="crumb-divider">/</span><strong>School management</strong></div><div className="topbar-right"><span className="platform-user-label"><span className="live-dot" />Platform access</span><span className="topbar-separator" /><Avatar user={auth.user} className="avatar avatar-soft" /></div></header>
         <div className="dashboard-content platform-content">
           <div className="welcome-row"><div><p className="eyebrow">PLATFORM CONSOLE</p><h1>School management</h1><p className="muted welcome-subtitle">Manage school access and memberships from one place.</p></div><button className="button button-primary" onClick={() => setDialog(true)}><Plus size={17} />Create a school</button></div>
           {notice && <div className="notice-banner"><Check size={17} />{notice}<button aria-label="Dismiss notification" onClick={() => setNotice("")}><X size={16} /></button></div>}
@@ -1118,6 +1245,7 @@ function PlatformDashboard({ auth, onLogout }) {
       </main>
       {dialog && <ActionDialog type="organization" onClose={() => setDialog(false)} onSubmit={createSchool} />}
       {editingOrganization && <EditOrganizationDialog organization={editingOrganization} onClose={() => setEditingOrganization(null)} onSubmit={(body) => updateSchool(editingOrganization._id, body)} />}
+      {settingsOpen && <SettingsDialog auth={auth} onAuthChange={onAuthChange} darkMode={darkMode} onToggleTheme={onToggleTheme} onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }

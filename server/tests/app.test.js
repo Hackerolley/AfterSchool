@@ -27,6 +27,7 @@ import { privateDocumentUrl } from "../src/modules/assignments/cloudinary.servic
 import { createLibraryItemSchema } from "../src/modules/library/library.validator.js";
 import { updateProgressSchema } from "../src/modules/quran/quran.validator.js";
 import { clearQuranTokenCache, fetchQuranContent } from "../src/modules/quran/quran.service.js";
+import { isSupportedImage } from "../src/modules/settings/settings.upload.js";
 
 function makeApp() {
   return createApp({
@@ -185,6 +186,25 @@ test("library routes require a signed-in school member", async () => {
     .set("X-CSRF-Token", csrfResponse.body.data.csrfToken)
     .send({})
     .expect(401);
+});
+
+test("settings routes require an authenticated account", async () => {
+  const agent = request.agent(makeApp());
+  const csrfResponse = await agent.get("/api/v1/auth/csrf").expect(200);
+  await agent.get("/api/v1/settings/profile").expect(401);
+  await agent.get("/api/v1/settings/school").expect(401);
+  await agent
+    .post("/api/v1/settings/profile/avatar")
+    .set("X-CSRF-Token", csrfResponse.body.data.csrfToken)
+    .attach("file", Buffer.from("not an image"), "profile.png")
+    .expect(401);
+});
+
+test("settings image validation accepts supported signatures and rejects non-images", () => {
+  assert.equal(isSupportedImage(Buffer.from([0xff, 0xd8, 0xff, 0x00])), true);
+  assert.equal(isSupportedImage(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])), true);
+  assert.equal(isSupportedImage(Buffer.from("RIFF0000WEBP")), true);
+  assert.equal(isSupportedImage(Buffer.from("not an image")), false);
 });
 
 test("library validation accepts YouTube resources and rejects unsafe or incomplete entries", () => {

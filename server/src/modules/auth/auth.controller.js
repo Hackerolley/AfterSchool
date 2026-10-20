@@ -26,14 +26,14 @@ export async function login(req, res) {
   const organization = await Organization.findOne({
     ...(organizationId ? { _id: organizationId } : { slug: organizationSlug }),
     status: "active",
-  }).select("_id name slug");
+  }).select("_id name slug logoUrl");
   if (!organization) throw new HttpError(401, "Invalid email or password");
 
   const membership = await Membership.findOne({
     user: user._id,
     organization: organization._id,
     status: "active",
-  }).populate("organization", "name slug status");
+  }).populate("organization", "name slug status logoUrl");
   if (!membership || membership.organization.status !== "active") {
     throw new HttpError(401, "Invalid email or password");
   }
@@ -51,6 +51,7 @@ export async function login(req, res) {
         id: membership.organization._id,
         name: membership.organization.name,
         slug: membership.organization.slug,
+        logoUrl: membership.organization.logoUrl,
       },
       role: membership.role,
       csrfToken: req.session.csrfToken,
@@ -111,6 +112,7 @@ export function me(req, res) {
         id: req.organization._id,
         name: req.organization.name,
         slug: req.organization.slug,
+        logoUrl: req.organization.logoUrl,
       },
       role: req.membership.role,
     },
@@ -123,5 +125,6 @@ function publicUser(user) {
     firstName: user.firstName,
     lastName: user.lastName,
     email: user.email,
+    avatarUrl: user.avatarUrl || "",
   };
 }

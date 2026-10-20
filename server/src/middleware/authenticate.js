@@ -11,7 +11,7 @@ export async function authenticate(req, res, next) {
     const user = await User.findOne({
       _id: req.session.userId,
       status: "active",
-    }).select("_id firstName lastName email status platformRole");
+    }).select("_id firstName lastName email status platformRole avatarUrl avatarPublicId");
 
     if (!user) {
       req.session.destroy(() => {});
@@ -43,7 +43,7 @@ export async function requireOrganization(req, res, next) {
       user: req.user._id,
       organization: organizationId,
       status: "active",
-    }).populate("organization", "name slug status");
+    }).populate("organization", "name slug status logoUrl");
 
     if (!membership || membership.organization.status !== "active") {
       throw new HttpError(403, "Active membership in this organization is required");

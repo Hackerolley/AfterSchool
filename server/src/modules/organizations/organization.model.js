@@ -12,6 +12,8 @@ const organizationSchema = new mongoose.Schema(
       maxlength: 80,
     },
     status: { type: String, enum: ["active", "suspended", "inactive"], default: "active" },
+    logoUrl: { type: String, default: "" },
+    logoPublicId: { type: String, default: "" },
   },
   { timestamps: true, strict: "throw" },
 );

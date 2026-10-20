@@ -19,6 +19,8 @@ const userSchema = new mongoose.Schema(
       enum: ["active", "inactive", "suspended"],
       default: "active",
     },
+    avatarUrl: { type: String, default: "" },
+    avatarPublicId: { type: String, default: "" },
     platformRole: {
       type: String,
       enum: ["platform_admin"],
