@@ -147,6 +147,31 @@ test("Quran content client obtains and uses a server-side client-credentials tok
   }
 });
 
+test("Quran invalid client credentials return an actionable configuration error", async () => {
+  const originalFetch = global.fetch;
+  clearQuranTokenCache();
+  global.fetch = async () => new Response(JSON.stringify({
+    error: "invalid_client",
+    error_description: "Client authentication failed",
+  }), {
+    status: 401,
+    headers: { "Content-Type": "application/json" },
+  });
+  try {
+    await assert.rejects(
+      fetchQuranContent({
+        QURAN_CLIENT_ID: "invalid-client",
+        QURAN_CLIENT_SECRET: "invalid-secret",
+        QURAN_API_ENV: "production",
+      }, "/chapters"),
+      (error) => error.status === 502 && /credentials/.test(error.message) && /environment/.test(error.message),
+    );
+  } finally {
+    global.fetch = originalFetch;
+    clearQuranTokenCache();
+  }
+});
+
 test("assignment routes require a signed-in school member", async () => {
   await request(makeApp()).get("/api/v1/assignments").expect(401);
 });

@@ -65,7 +65,10 @@ async function getAccessToken(config) {
     "Quran.com authentication is temporarily unavailable.",
   );
   if (!response.ok || typeof payload.access_token !== "string") {
-    throw new HttpError(502, "Quran.com authentication failed. Check the server-side client credentials and API environment.");
+    throw new HttpError(
+      502,
+      "Quran.com rejected the client credentials. Verify the client ID and secret, and that both are for the configured production or pre-live environment.",
+    );
   }
 
   tokenCache.set(cacheKey, {

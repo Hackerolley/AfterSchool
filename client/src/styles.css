@@ -773,3 +773,333 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+
+/* Refined visual system */
+:root {
+  font-family: "Inter", sans-serif;
+  color: #28283a;
+  background: #f5f5fa;
+  --ink: #28283a;
+  --muted: #707388;
+  --green: #6255d9;
+  --green-dark: #4d42bd;
+  --line: #e7e6f0;
+  --paper: #fff;
+  --canvas: #f5f5fa;
+  --font-display: "Plus Jakarta Sans", "Inter", sans-serif;
+  --shadow: 0 16px 40px rgba(40, 37, 78, .08);
+}
+
+body { color: #28283a; background: #f5f5fa; font-size: 15px; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline-color: rgba(98, 85, 217, .34); }
+.dashboard-layout { background: #f5f5fa; }
+.sidebar { border-color: #e8e7f0; box-shadow: 5px 0 24px #28254e05; }
+.brand-mark { background: #6255d9; box-shadow: inset 0 1px 0 #ffffff42, 0 5px 13px #6255d926; }
+.brand-name span { color: #7569df; }
+.school-picker { border-color: #e9e8f1; background: #fbfbfe; }
+.school-monogram { color: #5146c2; background: #efeeff; }
+.school-picker-copy strong { color: #333348; font-size: 12px; }
+.school-picker-copy span { color: #777b8f; font-size: 11px; }
+.nav-label { color: #818397; font-size: 10px; }
+.nav-item { color: #686b80; font-size: 13px; }
+.nav-item:hover { color: #4d42bd; background: #f6f5ff; }
+.nav-item.nav-active { color: #4d42bd; background: #efeeff; }
+.nav-item.nav-active svg { color: #6255d9; }
+.nav-count { color: #5146c2; background: #e9e7ff; font-size: 10px; }
+.term-card { background: #f6f5fc; }
+.term-badge, .term-badge svg { color: #7065d3; }
+.term-card strong { color: #3f3e58; font-size: 12px; }
+.term-card > span:last-of-type { color: #74778b; font-size: 11px; }
+.term-progress { background: #e4e2f1; }
+.term-progress i { background: #8074e5; }
+.sidebar-user { border-color: #eae9f1; }
+.avatar-dark { color: #f5f3ff; background: #6255d9; }
+.avatar-soft { color: #5449c7; background: #efeeff; }
+.sidebar-user-copy strong { color: #35354b; font-size: 12px; }
+.sidebar-user-copy span { color: #777b8f; font-size: 11px; }
+.icon-button:hover { color: #5146c2; background: #f0efff; }
+.topbar { border-color: #e8e7f0; background: #fffffff2; }
+.breadcrumbs { color: #7e8092; font-size: 12px; }
+.breadcrumbs strong { color: #35354a; }
+.date-label { color: #6f7285; font-size: 12px; }
+.date-label svg { color: #7065d3; }
+.topbar-separator { background: #e8e7f0; }
+.dashboard-content { padding-top: 35px; }
+.welcome-row .eyebrow, .eyebrow { color: #73758a; font-size: 11px; letter-spacing: 1.15px; }
+.welcome-row h1 { color: #29293d; }
+.welcome-subtitle { color: #73768a; font-size: 14px; }
+.wave { color: #ee9e76; }
+.metric-card { border-color: #e8e7f0; border-radius: 15px; box-shadow: 0 4px 14px #28254e06; }
+.metric-card:hover { border-color: #d4d0f6; }
+.metric-top { color: #63667c; font-size: 12px; }
+.metric-icon.green, .quick-icon.green { color: #5146c2; background: #efeeff; }
+.metric-icon.peach, .quick-icon.peach { color: #ad6847; background: #fff0e8; }
+.metric-icon.blue { color: #4471ad; background: #edf3ff; }
+.metric-icon.lavender { color: #7854a9; background: #f4edff; }
+.metric-value { color: #29293d; }
+.metric-foot { color: #73768a; font-size: 11px; }
+.metric-arrow { color: #6255d9; }
+.skeleton-number { background: linear-gradient(90deg, #ebebf3 25%, #f7f7fb 50%, #ebebf3 75%); }
+.section-row h2, .page-heading h2 { color: #29293d; font-size: 21px; }
+.text-button { color: #5549c7; font-size: 12px; }
+.text-button:hover { color: #3d34a8; }
+.class-card, .course-list, .people-list, .panel, .quran-panel { border-color: #e8e7f0; box-shadow: 0 4px 16px #28254e05; }
+.class-card { border-radius: 15px; }
+.class-art-mint { background: #eeedff; }
+.class-art-peach { background: #fff0e8; }
+.class-art-blue { background: #edf2ff; }
+.class-art-icon { color: #6255d9; box-shadow: 0 8px 22px #28254e10; }
+.class-code { color: #5146b7; }
+.class-title-row h3 { color: #303044; font-size: 13px; }
+.class-title-row p, .class-card-meta { color: #73768a; font-size: 11px; }
+.class-card-meta > span:first-child svg { color: #6255d9; }
+.course-row { min-height: 82px; }
+.course-main h3 { color: #303044; font-size: 13px; }
+.course-main p { color: #73768a; font-size: 11px; }
+.course-status { color: #5650a6; font-size: 10px; }
+.course-status i { background: #8175df; }
+.course-tone-0 { color: #5146c2; background: #efeeff; }
+.course-tone-1 { color: #ad6847; background: #fff0e8; }
+.course-tone-2 { color: #4471ad; background: #edf3ff; }
+.course-tone-3 { color: #7854a9; background: #f4edff; }
+.button { font-size: 13px; }
+.button-primary { background: #6255d9; box-shadow: 0 5px 14px #6255d925; }
+.button-primary:hover:not(:disabled) { background: #5044c5; box-shadow: 0 7px 18px #6255d933; }
+.button-dark { background: #292843; }
+.button-dark:hover:not(:disabled) { background: #201f38; }
+.button-quiet { border-color: #e5e4ed; color: #5e6075; }
+.button-small { font-size: 12px; }
+.form-error { font-size: 13px; }
+.error-banner, .notice-banner { font-size: 13px; }
+.page-heading .muted, .muted { color: #707388; }
+.page-heading .muted { font-size: 13px; }
+.search-control input { color: #38394e; font-size: 12px; }
+.form-field > span, .field > span { color: #36364b; font-size: 13px; }
+.form-field small, .field small { color: #6f7286; font-size: 12px; }
+.plain-input, .input-wrap input { color: #29293d; font-size: 14px; }
+.login-page { background: #faf9fd; }
+.login-story { color: #f6f4ff; background: linear-gradient(145deg, #292647, #39305f 72%, #4d3e78); }
+.login-story .brand-mark { background: #7062e0; }
+.login-story .brand-name span { color: #c3bdff; }
+.light-eyebrow { color: #c6c1f0; }
+.story-content h1 em { color: #d3a4db; }
+.story-copy { color: #d4d0e8; }
+.story-chip { color: #d5d1e9; }
+.live-dot { background: #ecae83; box-shadow: 0 0 0 3px #ecae8321; }
+.board-icon.mint { background: #d6d0ff; }
+.board-icon.peach { background: #ffd9c5; }
+.board-stats small, .story-foot { color: #c2beda; }
+.week-strip { color: #b6b1d1; }
+.week-strip .today { color: #fff; }
+.week-strip i { background: #f2b38c; }
+.login-icon { border-color: #e9e6fb; color: #6255d9; background: #f2f0ff; }
+.login-switch { border-color: #e8e6ef; background: #f3f2f8; }
+.login-switch button { color: #717386; font-size: 13px; }
+.login-switch button.selected { color: #4d42bd; }
+.login-heading .muted { color: #707388; font-size: 14px; }
+.input-wrap, .plain-input { border-color: #dedee9; }
+.input-wrap:focus-within, .plain-input:focus { border-color: #8579e6; box-shadow: 0 0 0 3px #7062e01c; }
+.input-wrap { color: #777991; }
+.login-help { color: #73768a; font-size: 12px; }
+.login-footer { color: #77798b; font-size: 11px; }
+
+/* Quran colors and type tuned for long reading sessions. */
+.quran-welcome { color: #f7f5ff; background: linear-gradient(112deg, #292647, #49396c 72%, #684b7c); }
+.quran-welcome .eyebrow, .quran-welcome-stats small { color: #d0cbea; }
+.quran-welcome-copy > p:not(.eyebrow) { color: #e0ddef; font-size: 13px; }
+.quran-welcome-stats strong { font-size: 12px; }
+.quran-welcome-stats > span > svg { color: #5748b9; background: #f0edff; }
+.quran-art-book { color: #e5d9f5; border-color: #ffffff44; background: #ffffff16; }
+.quran-shortcuts button { border-color: #e7e6ef; border-radius: 12px; }
+.quran-shortcuts button:hover, .quran-shortcuts button.active { border-color: #cfcaf5; background: #f7f6ff; }
+.quran-shortcuts button > svg { color: #584cc6; background: #efeeff; }
+.quran-shortcuts button:nth-child(2) > svg { color: #4471ad; background: #edf3ff; }
+.quran-shortcuts button:nth-child(3) > svg { color: #7854a9; background: #f4edff; }
+.quran-shortcuts button:nth-child(4) > svg { color: #ad6847; background: #fff0e8; }
+.quran-shortcuts strong { color: #303044; font-size: 12px; }
+.quran-shortcuts small { color: #73768a; font-size: 10px; }
+.quran-panel { border-radius: 14px; }
+.quran-panel-heading h2 { color: #29293d; font-size: 17px; }
+.quran-source, .quran-select, .quran-verse-label { color: #72758a; font-size: 10px; }
+.quran-select select, .quran-reciter-picker select { border-color: #e2e1ec; color: #38394e; font-size: 12px; }
+.quran-settings-button { border-color: #e3e2ed; color: #55566c; font-size: 11px; }
+.quran-verse { border-color: #edecf3; background: linear-gradient(145deg, #faf9ff, #fff 55%, #f8f7fc); }
+.quran-arabic { color: #29263b; }
+.quran-translation { color: #56596e; font-size: 14px; line-height: 1.8; }
+.quran-repeat-control { color: #62657b; font-size: 11px; }
+.quran-repeat-control select { border-color: #e4e3ed; color: #45465d; font-size: 11px; }
+.quran-repeat-status { color: #6559c6; font-size: 11px; }
+.quran-icon-action { border-color: #e4e3ed; color: #66687c; }
+.quran-icon-action.selected { border-color: #d2cff7; color: #5549c7; background: #f2f0ff; }
+.quran-mark-read { border-color: #d7d3f6; color: #5146bd; background: #f5f4ff; font-size: 11px; }
+.quran-verse-navigation button { color: #5549c7; font-size: 11px; }
+.quran-verse-navigation button:disabled, .quran-verse-navigation > span { color: #85879a; }
+.quran-reader-loading, .quran-reciter-note, .quran-featured-copy, .quran-empty-note { color: #6e7186; font-size: 12px; }
+.quran-reciter-picker { color: #55586e; font-size: 12px; }
+.quran-chip-list button { border-color: #e6e4f0; color: #5146bd; background: #f8f7ff; font-size: 11px; }
+.quran-progress-ring { background: conic-gradient(#7062dc var(--quran-progress), #ebeaf2 0); }
+.quran-progress-ring strong, .quran-memorized-number strong { color: #4d42ad; }
+.quran-progress-copy strong, .quran-mini-stats strong, .quran-plan-task strong, .quran-activity-row strong { color: #44455b; font-size: 11px; }
+.quran-progress-copy > span, .quran-mini-stats small, .quran-plan-task small, .quran-activity-row small, .quran-goal-editor { color: #73768a; font-size: 10px; }
+.quran-progress-track { background: #eae9f2; }
+.quran-progress-track i { background: #786ce0; }
+.quran-text-link { color: #5549c7; font-size: 11px; }
+.quran-mini-stats > span { border-color: #eeedf4; color: #7165ce; }
+.quran-save-goal, .quran-task-check.done { border-color: #d5d1f6; color: #5146bd; background: #f2f0ff; }
+.quran-task-check.done { color: #fff; background: #7062dc; }
+.quran-activity-icon { color: #6255d9; background: #efeeff; }
+
+@media (max-width: 650px) {
+  .dashboard-content { padding-top: 25px; }
+  .metric-top, .text-button { font-size: 11px; }
+  .quran-shortcuts strong { font-size: 11px; }
+  .quran-translation { font-size: 13px; }
+}
+
+/* Elegant glass surfaces with a contrasting aubergine navigation rail. */
+:root {
+  font-family: "DM Sans", sans-serif;
+  --ink: #242238;
+  --muted: #69677d;
+  --line: #e5e1ef;
+  --paper: rgba(255, 255, 255, .76);
+  --canvas: #f2f0f8;
+  --font-display: "Manrope", "DM Sans", sans-serif;
+  --shadow: 0 20px 55px rgba(40, 31, 72, .10);
+}
+
+body { color: #28263d; background: #f2f0f8; }
+.dashboard-layout {
+  background:
+    radial-gradient(ellipse at 76% 3%, rgba(219, 207, 255, .42), transparent 31%),
+    radial-gradient(ellipse at 48% 88%, rgba(223, 230, 255, .40), transparent 35%),
+    #f2f0f8;
+}
+.sidebar {
+  color: #f5f2ff;
+  border-right: 1px solid #ffffff15;
+  background: linear-gradient(165deg, #211d38 0%, #292342 55%, #302548 100%);
+  box-shadow: 12px 0 36px rgba(29, 23, 53, .13);
+}
+.sidebar .brand { color: #fff; }
+.sidebar .brand-name span { color: #c6b8fa; }
+.sidebar .brand-mark { color: #fff; background: linear-gradient(145deg, #8170e9, #6555cc); box-shadow: 0 7px 20px #6f60dc45; }
+.sidebar .school-picker { border-color: #ffffff1b; background: #ffffff0c; }
+.sidebar .school-monogram { color: #ede8ff; background: #ffffff18; }
+.sidebar .school-picker-copy strong { color: #fbfaff; }
+.sidebar .school-picker-copy span { color: #c0bad1; }
+.sidebar .school-picker > svg { color: #c3bdd6; }
+.sidebar .nav-label { color: #aaa3c3; }
+.sidebar .nav-item { color: #d0cadd; }
+.sidebar .nav-item:hover { color: #fff; background: #ffffff0e; }
+.sidebar .nav-item.nav-active {
+  color: #fff;
+  background: linear-gradient(100deg, #7668db55, #b6a9fa20);
+  box-shadow: inset 3px 0 #c4b5fd, inset 0 0 0 1px #ffffff0a;
+}
+.sidebar .nav-item.nav-active svg { color: #d6ccff; }
+.sidebar .nav-count { color: #f1edff; background: #ffffff20; }
+.sidebar .term-card { border: 1px solid #ffffff17; background: #ffffff0a; }
+.sidebar .term-badge, .sidebar .term-badge svg { color: #c0b4f8; }
+.sidebar .term-card strong { color: #f2efff; }
+.sidebar .term-card > span:last-of-type { color: #c0bad1; }
+.sidebar .term-progress { background: #ffffff22; }
+.sidebar .term-progress i { background: #b3a2ff; }
+.sidebar .sidebar-user { border-color: #ffffff1c; }
+.sidebar .avatar-dark { color: #f7f3ff; background: #6659bb; }
+.sidebar .sidebar-user-copy strong { color: #fff; }
+.sidebar .sidebar-user-copy span { color: #c0bad1; }
+.sidebar .logout-icon { color: #d1cbe0; }
+.sidebar .logout-icon:hover { color: #fff; background: #ffffff17; }
+.sidebar .settings-item { color: #d0cadd; }
+.sidebar .settings-item:hover { color: #fff; background: #ffffff0e; }
+.main-panel { min-height: 100vh; }
+.topbar {
+  border-color: #ffffffa3;
+  background: rgba(255, 255, 255, .62);
+  box-shadow: 0 1px 0 #ffffffbd;
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+}
+.dashboard-content { position: relative; }
+.welcome-row h1 {
+  color: #28243c;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: clamp(35px, 3.1vw, 47px);
+  font-weight: 700;
+  letter-spacing: -.7px;
+}
+.section-row h2, .page-heading h2, .quran-panel-heading h2 {
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -.25px;
+}
+.metric-card, .class-card, .course-list, .people-list, .panel, .quran-panel,
+.quran-shortcuts button, .inline-hint, .library-card, .assignment-card {
+  border-color: rgba(255, 255, 255, .88);
+  background: rgba(255, 255, 255, .70);
+  box-shadow: 0 12px 34px rgba(42, 34, 72, .065), inset 0 1px 0 rgba(255, 255, 255, .95);
+  backdrop-filter: blur(18px) saturate(145%);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
+}
+.metric-card { border-radius: 17px; }
+.metric-card:hover, .class-card:hover {
+  border-color: rgba(181, 168, 247, .76);
+  box-shadow: 0 20px 42px rgba(51, 39, 92, .12), inset 0 1px 0 #fff;
+}
+.class-card { border-radius: 17px; }
+.course-list, .people-list { overflow: hidden; border-radius: 15px; }
+.course-row, .person-row { border-color: #e9e5f0; }
+.course-row:hover, .person-row:hover { background: #ffffff86; }
+.topbar, .metric-card, .class-card, .course-list, .people-list, .panel, .quran-panel,
+.quran-shortcuts button, .inline-hint, .library-card, .assignment-card { transition: background .2s ease, box-shadow .2s ease, border-color .2s ease, transform .2s ease; }
+.quran-welcome {
+  border: 1px solid #ffffff55;
+  background:
+    radial-gradient(circle at 82% 20%, #c0adff3d, transparent 28%),
+    linear-gradient(118deg, #28223f 0%, #46365f 54%, #635076 100%);
+  box-shadow: 0 22px 48px rgba(43, 31, 71, .19), inset 0 1px 0 #ffffff35;
+}
+.quran-welcome h1 { font-family: "Cormorant Garamond", Georgia, serif; font-size: clamp(31px, 3vw, 43px); }
+.quran-art-book { border-color: #ffffff55; background: #ffffff18; box-shadow: inset 0 1px 0 #ffffff35, 0 12px 30px #17132b25; backdrop-filter: blur(16px); }
+.quran-shortcuts button { border-radius: 14px; }
+.quran-shortcuts button:hover, .quran-shortcuts button.active { border-color: #c9bdf5; background: rgba(249, 247, 255, .86); }
+.quran-panel { border-radius: 16px; }
+.quran-verse {
+  border-color: #ffffff;
+  background: linear-gradient(145deg, rgba(255,255,255,.90), rgba(250,248,255,.68));
+  box-shadow: inset 0 1px 0 #fff, 0 8px 22px #3529580a;
+}
+.quran-progress-ring, .quran-mini-stats > span, .quran-chip-list button,
+.quran-icon-action, .quran-goal-editor input, .quran-select select, .quran-reciter-picker select,
+.quran-settings-button {
+  box-shadow: inset 0 1px 0 #ffffffc9, 0 4px 12px #35295809;
+}
+.button-primary { background: linear-gradient(135deg, #7161d6, #594bbd); }
+.button-primary:hover:not(:disabled) { background: linear-gradient(135deg, #6455ca, #4e40b3); }
+.login-story {
+  background:
+    radial-gradient(ellipse at 70% 17%, rgba(177, 155, 232, .22), transparent 38%),
+    linear-gradient(150deg, #211d38, #33294c 64%, #51405d);
+}
+.login-story::before { border-color: #d8ceff17; box-shadow: 0 0 0 64px #d8ceff09, 0 0 0 128px #d8ceff06, 0 0 0 192px #d8ceff04; }
+.login-heading h2 { color: #29263e; font-family: "Cormorant Garamond", Georgia, serif; font-size: 43px; font-weight: 700; letter-spacing: -.6px; }
+.login-box { padding: 44px 34px; border: 1px solid #ffffffc9; border-radius: 24px; background: rgba(255,255,255,.64); box-shadow: 0 25px 65px #32264e12, inset 0 1px 0 #fff; backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+.login-side { background: radial-gradient(ellipse at 50% 42%, #e5e0f4 0%, #f5f3fa 58%, #f7f6fa 100%); }
+.login-switch { background: #f0eef7; }
+.input-wrap, .plain-input { background: rgba(255,255,255,.86); }
+.input-wrap:focus-within, .plain-input:focus { border-color: #887adf; box-shadow: 0 0 0 3px #7062e024; }
+.modal { border-color: #ffffffc9; background: rgba(255,255,255,.93); box-shadow: 0 30px 90px #21183d30, inset 0 1px 0 #fff; backdrop-filter: blur(24px); }
+.modal-backdrop { background: rgba(31, 26, 48, .46); backdrop-filter: blur(8px); }
+
+@media (max-width: 850px) {
+  .sidebar { box-shadow: 18px 0 45px rgba(20, 16, 39, .26); }
+}
+@media (max-width: 650px) {
+  .welcome-row h1 { font-size: 36px; }
+  .section-row h2, .page-heading h2, .quran-panel-heading h2 { font-size: 23px; }
+  .quran-welcome h1 { font-size: 33px; }
+  .login-box { padding: 30px 20px; border-radius: 19px; }
+  .login-heading h2 { font-size: 37px; }
+}

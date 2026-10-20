@@ -35,7 +35,7 @@ export function errorHandler(error, req, res, next) {
       path: req.originalUrl,
       error,
     });
-    message = "Internal server error";
+    if (!(error instanceof HttpError)) message = "Internal server error";
   }
 
   res.status(status).json({
