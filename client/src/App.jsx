@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import AssignmentPage from "./AssignmentPage.jsx";
 import LibraryPage from "./LibraryPage.jsx";
+import QuranPage from "./QuranPage.jsx";
 import {
   apiGet,
   apiPatch,
@@ -54,6 +55,7 @@ const navigation = [
   { id: "people", label: "People", icon: Users, adminOnly: true },
   { id: "assignments", label: "Assignments", icon: ClipboardList, roleOnly: ["teacher", "student"] },
   { id: "library", label: "Library", icon: BookOpen },
+  { id: "quran", label: "Quran Learning", icon: BookOpen, roleOnly: ["student"] },
 ];
 const dayLabel = new Intl.DateTimeFormat("en", { weekday: "long", month: "long", day: "numeric" }).format(new Date());
 
@@ -292,7 +294,13 @@ function SchoolDashboard({ auth, onLogout }) {
   const availableNavigation = navigation
     .filter((item) => (!item.adminOnly || role === "admin" || (item.id === "people" && role === "teacher"))
       && (!item.roleOnly || item.roleOnly.includes(role)))
-    .map((item) => role === "teacher" && item.id === "people" ? { ...item, label: "My students" } : item);
+    .map((item) => (
+      item.id === "classes" && role === "admin"
+        ? { ...item, label: "Classes" }
+        : role === "teacher" && item.id === "people"
+          ? { ...item, label: "My students" }
+          : item
+    ));
   const greeting = useMemo(() => {
     const hour = new Date().getHours();
     return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
@@ -444,7 +452,6 @@ function SchoolDashboard({ auth, onLogout }) {
         <div className="dashboard-content">
           <div className="welcome-row">
             <div><p className="eyebrow">{dayLabel.toUpperCase()}</p><h1>{greeting}, {person.firstName}<span className="wave">✳</span></h1><p className="muted welcome-subtitle">{role === "admin" ? "Here's what's happening across your school." : role === "teacher" ? "Your classes and learners, all in one place." : "Your learning journey, all in one place."}</p></div>
-            {role === "admin" && activePage !== "library" && <button className="button button-primary create-button" onClick={() => setDialog(activePage === "classes" ? "class" : activePage === "courses" ? "course" : activePage === "timetable" ? "timetable" : "student")}><Plus size={17} />{activePage === "classes" ? "New class" : activePage === "courses" ? "New course" : activePage === "timetable" ? "Set up timetable" : "Add student"}</button>}
           </div>
 
           {error && <div className="error-banner" role="alert"><span>{error}</span><button className="button button-small" onClick={refresh}>Try again</button></div>}
@@ -457,6 +464,7 @@ function SchoolDashboard({ auth, onLogout }) {
           {activePage === "people" && <PeoplePage role={role} data={data} loading={loading} onCreate={(type) => setDialog(type)} onOpenPerson={openPerson} search={search} setSearch={setSearch} />}
           {activePage === "assignments" && <AssignmentPage role={role} assignments={data.assignments} classes={data.classes} loading={loading} organizationId={orgId} onRefresh={refresh} />}
           {activePage === "library" && <LibraryPage role={role} items={data.library} loading={loading} organizationId={orgId} onRefresh={refresh} />}
+          {activePage === "quran" && <QuranPage organizationId={orgId} studentName={fullName(person)} />}
           <footer className="content-footer"><span>© {new Date().getFullYear()} Afterschool</span><span>School, in sync.</span></footer>
         </div>
       </main>
@@ -470,7 +478,7 @@ function SchoolDashboard({ auth, onLogout }) {
 
 function Overview({ role, data, loading, onNavigate, onEnroll, onOpenClass }) {
   const cards = [
-    { label: "My classes", value: data.classes.length, icon: School, tone: "green", trend: role === "admin" ? "Across your school" : "Ready to explore", page: "classes" },
+    { label: role === "admin" ? "Classes" : "My classes", value: data.classes.length, icon: School, tone: "green", trend: role === "admin" ? "Across your school" : "Ready to explore", page: "classes" },
     { label: "Courses", value: data.courses.length, icon: BookOpen, tone: "peach", trend: "Learning paths", page: "courses" },
     ...(role === "admin" ? [
       { label: "Students", value: data.students.length, icon: GraduationCap, tone: "blue", trend: "In your community", page: "people" },
@@ -495,12 +503,15 @@ function Overview({ role, data, loading, onNavigate, onEnroll, onOpenClass }) {
       </div>
 
       {(role === "teacher" || role === "student") && <div className="section-row"><div><p className="eyebrow">YOUR LEARNING SPACE</p><h2>Assignments</h2></div><button className="text-button" onClick={() => onNavigate("assignments")}>View all <ArrowRight size={15} /></button></div>}
-      {!(role === "teacher" || role === "student") && <div className="section-row"><div><p className="eyebrow">YOUR LEARNING SPACE</p><h2>Classes to keep you moving</h2></div><button className="text-button" onClick={() => onNavigate("classes")}>View all <ArrowRight size={15} /></button></div>}
       {(role === "teacher" || role === "student") && (loading ? <LoadingCards /> : data.assignments.length === 0 ? <EmptyState icon={ClipboardList} title={role === "teacher" ? "Your classes are ready for assignments" : "No assignments yet"} text={role === "teacher" ? "Create assignments for the classes you teach." : "Assignments shared with your classes will appear here."} action={role === "teacher" ? <button className="button button-primary button-small" onClick={() => onNavigate("assignments")}><ClipboardList size={15} />Open assignments</button> : null} /> : (
         <div className="assignment-list overview-assignment-list">{data.assignments.slice(0, 3).map((assignment) => <article className="assignment-card" key={assignment._id}><span className="assignment-icon assignment-text"><ClipboardList size={19} /></span><div className="assignment-card-copy"><div className="assignment-card-heading"><h3>{assignment.title}</h3>{assignment.submission && <span className="assignment-state submitted">Submitted</span>}</div><p>{assignment.class?.name || "Class"}</p><small>{assignmentDueLabel(assignment.dueAt)}</small></div><button className="icon-button assignment-open" onClick={() => onNavigate("assignments")} aria-label="Open assignments"><ArrowUpRight size={18} /></button></article>)}</div>
       ))}
-      <div className="section-row"><div><p className="eyebrow">YOUR LEARNING SPACE</p><h2>{role === "admin" ? "Classes to keep you moving" : "Your classes"}</h2></div><button className="text-button" onClick={() => onNavigate("classes")}>View all <ArrowRight size={15} /></button></div>
-      {loading ? <LoadingCards /> : data.classes.length === 0 ? <EmptyState icon={School} title="Your classes will appear here" text={role === "admin" ? "Create a class, assign a teacher, and invite learners to get started." : "There are no classes linked to your account yet."} action={role === "admin" ? <button className="button button-primary button-small" onClick={() => onNavigate("classes")}><Plus size={15} />Create a class</button> : null} /> : (
+      <div className="section-row"><div><p className="eyebrow">YOUR LEARNING SPACE</p><h2>{role === "admin" ? "Courses" : "Your classes"}</h2></div><button className="text-button" onClick={() => onNavigate(role === "admin" ? "courses" : "classes")}>View all <ArrowRight size={15} /></button></div>
+      {loading ? <LoadingCards /> : role === "admin" ? data.courses.length === 0 ? (
+        <EmptyState icon={BookOpen} title="No courses yet" text="Create your school's first course to start shaping the curriculum." action={<button className="button button-primary button-small" onClick={() => onNavigate("courses")}><BookOpen size={15} />View courses</button>} />
+      ) : (
+        <div className="course-list"><CourseRows courses={data.courses.slice(0, 3)} /></div>
+      ) : data.classes.length === 0 ? <EmptyState icon={School} title="Your classes will appear here" text="There are no classes linked to your account yet." /> : (
         <div className="class-grid">
           {data.classes.slice(0, 3).map((schoolClass, index) => <ClassCard key={schoolClass._id} schoolClass={schoolClass} index={index} onOpen={() => onOpenClass(schoolClass)} />)}
         </div>
@@ -836,10 +847,24 @@ function CoursesPage({ courses, loading, role, onCreate }) {
     <>
       <div className="page-heading"><div><p className="eyebrow">GROW AT YOUR OWN PACE</p><h2>Courses</h2><p className="muted">Every new idea opens another door.</p></div>{role === "admin" && <button className="button button-primary" onClick={onCreate}><Plus size={17} />New course</button>}</div>
       {loading ? <LoadingCards /> : courses.length === 0 ? <EmptyState icon={BookOpen} title="Your course library is ready" text={role === "admin" ? "Add your first course and start shaping the school curriculum." : "Courses connected to your classes will show up here."} action={role === "admin" ? <button className="button button-primary button-small" onClick={onCreate}><Plus size={15} />Create a course</button> : null} /> : (
-        <div className="course-list">{courses.map((course, index) => <article className="course-row" key={course._id}><div className={`course-illustration course-tone-${index % 4}`}><BookOpen size={21} /></div><div className="course-main"><div className="course-title-line"><h3>{course.name}</h3><span className="course-status"><i />{course.status}</span></div><p>{course.description || "A space to discover, practise, and grow."}</p></div><span className="course-code">{course.code}</span><span className="course-row-arrow"><ArrowUpRight size={17} /></span></article>)}</div>
+        <div className="course-list"><CourseRows courses={courses} /></div>
       )}
     </>
   );
+}
+
+function CourseRows({ courses }) {
+  return courses.map((course, index) => (
+    <article className="course-row" key={course._id}>
+      <div className={`course-illustration course-tone-${index % 4}`}><BookOpen size={21} /></div>
+      <div className="course-main">
+        <div className="course-title-line"><h3>{course.name}</h3><span className="course-status"><i />{course.status}</span></div>
+        <p>{course.description || "A space to discover, practise, and grow."}</p>
+      </div>
+      <span className="course-code">{course.code}</span>
+      <span className="course-row-arrow"><ArrowUpRight size={17} /></span>
+    </article>
+  ));
 }
 
 function PeoplePage({ role, data, loading, onCreate, onOpenPerson, search, setSearch }) {

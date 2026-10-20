@@ -129,3 +129,11 @@ export function apiPatch(path, body, organizationId) {
 export function apiDelete(path, organizationId) {
   return request(path, { method: "DELETE", organizationId, csrfToken: csrfToken() });
 }
+
+export function quranGet(path, organizationId) {
+  return request(`/quran${path}`, { organizationId });
+}
+
+export function quranPost(body, organizationId) {
+  return request("/quran/progress", { method: "POST", body, organizationId, csrfToken: csrfToken() });
+}

@@ -29,6 +29,18 @@ CLOUDINARY_API_SECRET=your_api_secret
 
 Find the values in your Cloudinary account dashboard. Keep the API secret server-side and out of source control; `.env` files are ignored by Git. Restart the API after adding the values. Documents are uploaded as authenticated Cloudinary assets; authorized users receive a short-lived download URL. Assignment documents accept PDF, DOC, DOCX, and TXT files up to 10 MB; library ebooks accept PDF files up to 25 MB. Text and web/YouTube link assignments do not require Cloudinary.
 
+Student Quran Learning uses the Quran Foundation Content API for chapter text, translations, recitations, and audio. Add the credentials from the Quran Foundation Developer Console to the Render backend environment (or `server/.env` locally):
+
+```text
+QURAN_CLIENT_ID=your_client_id
+QURAN_CLIENT_SECRET=your_client_secret
+QURAN_API_ENV=production
+```
+
+Keep the client secret on the backend only; never set it as a `VITE_` variable. Use `QURAN_API_ENV=prelive` only with matching pre-live credentials. Quran reading goals, bookmarks, memorized verses, and reading activity are stored per student in AfterSchool. Access to Quran.com-synced user accounts requires a separate OAuth consent flow and is not part of this content integration.
+
+Grant the credentials the Quran Foundation **Content** API permission. After adding or changing the credentials in Render, redeploy the backend service.
+
 If startup reports a MongoDB TLS/SSL handshake error, confirm the Atlas cluster is running and its Network Access IP access list includes your current public IP. Then check whether a VPN, proxy, firewall, or managed network is interrupting TLS; retry from a trusted network if necessary. Keep TLS verification enabled.
 
 ## Initial organization administrator

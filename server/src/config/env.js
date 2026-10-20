@@ -18,6 +18,9 @@ const envSchema = z.object({
   CLOUDINARY_CLOUD_NAME: z.string().default(""),
   CLOUDINARY_API_KEY: z.string().default(""),
   CLOUDINARY_API_SECRET: z.string().default(""),
+  QURAN_CLIENT_ID: z.string().default(""),
+  QURAN_CLIENT_SECRET: z.string().default(""),
+  QURAN_API_ENV: z.enum(["production", "prelive"]).default("production"),
 });
 
 const parsed = envSchema.safeParse(process.env);

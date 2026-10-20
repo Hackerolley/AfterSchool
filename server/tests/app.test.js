@@ -25,6 +25,8 @@ import {
 } from "../src/modules/assignments/assignment.validator.js";
 import { privateDocumentUrl } from "../src/modules/assignments/cloudinary.service.js";
 import { createLibraryItemSchema } from "../src/modules/library/library.validator.js";
+import { updateProgressSchema } from "../src/modules/quran/quran.validator.js";
+import { clearQuranTokenCache, fetchQuranContent } from "../src/modules/quran/quran.service.js";
 
 function makeApp() {
   return createApp({
@@ -89,6 +91,60 @@ test("health check is unavailable when MongoDB is disconnected", async () => {
   });
   const response = await request(app).get("/api/v1/health").expect(503);
   assert.equal(response.body.data.database, "disconnected");
+});
+
+test("Quran routes require an authenticated school student", async () => {
+  await request(makeApp()).get("/api/v1/quran/chapters").expect(401);
+  await request(makeApp()).get("/api/v1/quran/progress").expect(401);
+});
+
+test("Quran progress actions validate goals and canonical verse keys", () => {
+  assert.equal(updateProgressSchema.safeParse({ action: "goal", dailyGoal: 5 }).success, true);
+  assert.equal(updateProgressSchema.safeParse({ action: "goal", dailyGoal: 0 }).success, false);
+  assert.equal(updateProgressSchema.safeParse({ action: "bookmark", verseKey: "2:255" }).success, true);
+  assert.equal(updateProgressSchema.safeParse({ action: "read", verseKey: "115:1" }).success, false);
+  assert.equal(updateProgressSchema.safeParse({ action: "memorize", verseKey: "2:0" }).success, false);
+});
+
+test("Quran content requests fail explicitly until server credentials are configured", async () => {
+  await assert.rejects(
+    fetchQuranContent({ QURAN_CLIENT_ID: "", QURAN_CLIENT_SECRET: "" }, "/chapters"),
+    (error) => error.status === 503 && /not configured/.test(error.message),
+  );
+});
+
+test("Quran content client obtains and uses a server-side client-credentials token", async () => {
+  const originalFetch = global.fetch;
+  const calls = [];
+  clearQuranTokenCache();
+  global.fetch = async (url, options) => {
+    calls.push({ url: String(url), options });
+    const isTokenRequest = String(url).endsWith("/oauth2/token");
+    return new Response(JSON.stringify(isTokenRequest
+      ? { access_token: "test-access-token", expires_in: 3600 }
+      : { chapters: [] }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  };
+  try {
+    const result = await fetchQuranContent({
+      QURAN_CLIENT_ID: "test-client",
+      QURAN_CLIENT_SECRET: "test-secret",
+      QURAN_API_ENV: "prelive",
+    }, "/chapters", new URLSearchParams({ language: "en" }));
+    assert.deepEqual(result, { chapters: [] });
+    assert.match(calls[0].url, /^https:\/\/prelive-oauth2\.quran\.foundation\/oauth2\/token$/);
+    assert.match(calls[0].options.headers.Authorization, /^Basic /);
+    assert.match(String(calls[0].options.body), /grant_type=client_credentials/);
+    assert.match(String(calls[0].options.body), /scope=content/);
+    assert.match(calls[1].url, /^https:\/\/apis-prelive\.quran\.foundation\/content\/api\/v4\/chapters\?language=en$/);
+    assert.equal(calls[1].options.headers["x-auth-token"], "test-access-token");
+    assert.equal(calls[1].options.headers["x-client-id"], "test-client");
+  } finally {
+    global.fetch = originalFetch;
+    clearQuranTokenCache();
+  }
 });
 
 test("assignment routes require a signed-in school member", async () => {

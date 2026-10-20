@@ -19,6 +19,7 @@ export function createApp({ config, sessionStore, getDatabaseState }) {
     contentSecurityPolicy: {
       directives: {
         frameSrc: ["'self'", "https://www.youtube-nocookie.com"],
+        mediaSrc: ["'self'", "https://verses.quran.com", "https://download.quranicaudio.com"],
       },
     },
   }));
