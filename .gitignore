@@ -2,6 +2,7 @@ node_modules/
 server/node_modules/
 client/dist/
 .env
+client/.env.local
 server/.env
 server/coverage/
 npm-debug.log*
