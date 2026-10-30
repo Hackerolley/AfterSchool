@@ -155,7 +155,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .welcome-row h1 { margin: 8px 0 5px; color: #263a30; font: 700 clamp(24px, 2.3vw, 31px)/1.25 var(--font-display); letter-spacing: -1.3px; }
 .welcome-subtitle { margin: 0; font-size: 12px; }
 .wave { display: inline-block; margin-left: 10px; color: #87a977; font-size: 19px; vertical-align: 3px; }
-.create-button { min-height: 38px; margin-bottom: 2px; }
 .metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 13px; margin-bottom: 34px; }
 .metric-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .metric-card { min-width: 0; padding: 16px 17px 13px; border: 1px solid #e9ede8; border-radius: 12px; background: #fff; text-align: left; cursor: pointer; box-shadow: 0 3px 10px #243a2e04; animation: rise-in .38s both; transition: transform .16s ease, box-shadow .16s ease, border .16s ease; }
@@ -696,8 +695,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .quran-verse { min-height: 200px; padding: 16px 11px; }
   .quran-arabic { font-size: 30px; }
   .welcome-subtitle { max-width: 320px; font-size: 10px; line-height: 1.6; }
-  .create-button { align-self: flex-end; min-height: 34px; padding: 0 10px; font-size: 0; }
-  .create-button svg { width: 18px; }
   .metric-grid, .metric-three { gap: 8px; margin-bottom: 25px; }
   .metric-card { padding: 12px; }
   .metric-top { font-size: 9px; }
@@ -1611,3 +1608,25 @@ html[data-theme="dark"] .button-primary:hover:not(:disabled) { background: #1687
 html[data-theme="dark"] .text-button,
 html[data-theme="dark"] .metric-arrow { color: #6bb2ff; }
 html[data-theme="dark"] .nav-item.nav-active { color: #b9dcff; background: #12355b; }
+
+.action-dialog { width: min(100%, 560px); }
+.action-dialog .modal-form { width: 100%; }
+.action-dialog .form-two { grid-template-columns: minmax(0, 1fr); }
+.action-dialog .form-field > span { font-size: 13px; }
+.action-dialog .form-field small { font-size: 12px; }
+.action-dialog .form-field input,
+.action-dialog .form-field select,
+.action-dialog .form-field textarea {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.action-dialog .form-field textarea { min-height: 100px; }
+
+@media (max-width: 650px) {
+  .action-dialog .form-field input,
+  .action-dialog .form-field select,
+  .action-dialog .form-field textarea { font-size: 16px; }
+}

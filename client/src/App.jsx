@@ -657,7 +657,6 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
         <div className="dashboard-content">
           <div className="welcome-row">
             <div><p className="eyebrow">{dayLabel.toUpperCase()}</p><h1>{greeting}, {person.firstName}<span className="wave">✳</span></h1><p className="muted welcome-subtitle">{role === "admin" ? "Here's what's happening across your school." : role === "teacher" ? "Your classes and learners, all in one place." : "Your learning journey, all in one place."}</p></div>
-            {role === "admin" && activePage === "overview" && <button className="button button-primary create-button" type="button" onClick={() => setDialog("class")}><Plus size={17} />Create class</button>}
           </div>
 
           {error && <div className="error-banner" role="alert"><span>{error}</span><button className="button button-small" onClick={refresh}>Try again</button></div>}
@@ -1474,7 +1473,7 @@ function ActionDialog({ type, initialClassId = "", courses = [], teachers = [], 
 
   return (
     <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !pending) onClose(); }}>
-      <section className="modal" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+      <section className={`modal action-dialog action-dialog-${type}`} role="dialog" aria-modal="true" aria-labelledby="dialog-title">
         <div className="modal-heading"><div><p className="eyebrow">SCHOOL WORKSPACE</p><h2 id="dialog-title">{successMessage ? "Successfully saved" : config.title}</h2><p>{successMessage ? "Everything is up to date." : config.subtitle}</p></div><button className="icon-button modal-close" aria-label="Close dialog" disabled={pending} onClick={onClose}><X size={19} /></button></div>
         {successMessage ? (
           <div className="action-success" role="status">
