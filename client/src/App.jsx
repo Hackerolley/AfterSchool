@@ -188,7 +188,7 @@ function App() {
 function LoadingScreen() {
   return (
     <main className="loading-screen">
-      <div className="brand-mark"><GraduationCap size={24} /></div>
+      <Brand compact />
       <div className="loading-line" />
       <p>Getting your school ready…</p>
     </main>
@@ -304,8 +304,16 @@ function SettingsDialog({ auth, onAuthChange, darkMode, onToggleTheme, organizat
 function Brand({ compact = false }) {
   return (
     <div className={`brand ${compact ? "brand-compact" : ""}`}>
-      <span className="brand-mark"><GraduationCap size={21} strokeWidth={2.1} /></span>
-      <span className="brand-name">after<span>school</span></span>
+      <svg className="brand-mark" viewBox="0 0 52 42" aria-hidden="true">
+        <path d="M2 14.5 26 4l24 10.5L26 25 2 14.5Z" fill="currentColor" />
+        <path d="M10 19v10.5c8.8 7.2 23.2 7.2 32 0V19l-16 7-16-7Z" fill="currentColor" />
+        <path d="M49 15v14" fill="none" stroke="#ffce3c" strokeLinecap="round" strokeWidth="2" />
+        <circle cx="49" cy="31" r="2" fill="#ffce3c" />
+      </svg>
+      <span className="brand-copy">
+        <span className="brand-name">after<span>School</span></span>
+        <span className="brand-tagline">LEARN <i>•</i> GROW <i>•</i> SUCCEED</span>
+      </span>
     </div>
   );
 }
@@ -403,6 +411,8 @@ function LoginScreen({ onLogin }) {
 function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout }) {
   const [activePage, setActivePage] = useState("overview");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const accountMenuRef = useRef(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [data, setData] = useState({ classes: [], courses: [], students: [], teachers: [], assignments: [], attendance: [], library: [] });
   const [loading, setLoading] = useState(true);
@@ -432,6 +442,36 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
     const hour = new Date().getHours();
     return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   }, []);
+
+  useEffect(() => {
+    if (!accountMenuOpen) return undefined;
+    const closeOnPointerDown = (event) => {
+      if (!accountMenuRef.current?.contains(event.target)) setAccountMenuOpen(false);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setAccountMenuOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOnPointerDown);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnPointerDown);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [accountMenuOpen]);
+
+  useEffect(() => {
+    if (!mobileNavOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setMobileNavOpen(false);
+    };
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [mobileNavOpen]);
 
   useEffect(() => {
     let active = true;
@@ -559,7 +599,7 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
         <p className="nav-label">WORKSPACE</p>
         <nav className="side-nav" aria-label="Main navigation">
           {availableNavigation.map(({ id, label, icon: Icon }) => (
-            <button key={id} className={`nav-item ${activePage === id ? "nav-active" : ""}`} onClick={() => { setActivePage(id); setMobileNavOpen(false); }}>
+            <button key={id} className={`nav-item ${activePage === id ? "nav-active" : ""}`} aria-current={activePage === id ? "page" : undefined} onClick={() => { setActivePage(id); setMobileNavOpen(false); }}>
               <Icon size={18} strokeWidth={1.9} /><span>{label}</span>{id === "classes" && <span className="nav-count">{data.classes.length}</span>}
             </button>
           ))}
@@ -578,9 +618,40 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
       {mobileNavOpen && <button className="mobile-overlay" aria-label="Close navigation overlay" onClick={() => setMobileNavOpen(false)} />}
       <main className="main-panel">
         <header className="topbar">
-          <button className="icon-button menu-button" aria-label="Open navigation" onClick={() => setMobileNavOpen(true)}><Menu size={20} /></button>
+          <button className="icon-button menu-button" aria-label="Open navigation" aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(true)}><Menu size={20} /></button>
           <div className="breadcrumbs"><span>Workspace</span><span className="crumb-divider">/</span><strong>{availableNavigation.find((item) => item.id === activePage)?.label}</strong></div>
-          <div className="topbar-right"><NotificationBell organizationId={orgId} onOpenAssignment={openNotifiedAssignment} /><span className="date-label"><CalendarDays size={15} />{dayLabel}</span><span className="topbar-separator" /><Avatar user={person} className="avatar avatar-soft" /><button className="icon-button top-logout" title="Sign out" aria-label="Sign out" onClick={onLogout}><LogOut size={17} /></button></div>
+          <div className="topbar-right">
+            <NotificationBell organizationId={orgId} onOpenAssignment={openNotifiedAssignment} />
+            <span className="date-label"><CalendarDays size={15} />{dayLabel}</span>
+            <span className="topbar-separator" />
+            <div className="account-menu" ref={accountMenuRef}>
+              <button
+                className={`account-menu-trigger ${accountMenuOpen ? "account-menu-trigger-open" : ""}`}
+                type="button"
+                aria-label="Open account menu"
+                aria-haspopup="menu"
+                aria-expanded={accountMenuOpen}
+                onClick={() => setAccountMenuOpen((open) => !open)}
+              >
+                <Avatar user={person} className="avatar avatar-soft" />
+                <ChevronDown size={14} />
+              </button>
+              {accountMenuOpen && (
+                <div className="account-menu-popover" role="menu" aria-label="Account">
+                  <div className="account-menu-identity">
+                    <Avatar user={person} className="avatar avatar-soft" />
+                    <span><strong>{fullName(person)}</strong><small>{roleNames[role]}</small></span>
+                  </div>
+                  <button type="button" role="menuitem" onClick={() => { setAccountMenuOpen(false); setSettingsOpen(true); }}>
+                    <Settings2 size={16} />Settings
+                  </button>
+                  <button className="account-menu-signout" type="button" role="menuitem" onClick={() => { setAccountMenuOpen(false); onLogout(); }}>
+                    <LogOut size={16} />Sign out
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </header>
 
         <div className="dashboard-content">
