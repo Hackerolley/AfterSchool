@@ -285,6 +285,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 /* Directory pages */
 .page-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin: 5px 0 20px; }
 .page-heading .muted { margin: 6px 0 0; font-size: 11px; }
+.classes-page-actions { display: flex; align-items: center; gap: 9px; }
 .search-control { display: flex; align-items: center; gap: 8px; width: 215px; min-height: 36px; padding: 0 10px; border: 1px solid #e5eae4; border-radius: 8px; color: #94a098; background: white; }
 .search-control input { width: 100%; min-width: 0; border: 0; outline: 0; color: #33443a; background: transparent; font-size: 10px; }
 .search-control input::placeholder { color: #a5aea7; }
@@ -718,6 +719,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .page-heading { align-items: flex-start; flex-direction: column; }
   .page-heading > .button { align-self: flex-end; }
   .page-heading .search-control { width: 100%; }
+  .classes-page-actions { width: 100%; }
+  .page-heading .classes-page-actions .search-control { width: auto; flex: 1; }
   .people-toolbar { align-items: stretch; flex-direction: column; }
   .people-toolbar .search-control { width: 100%; }
   .person-detail { display: none; }

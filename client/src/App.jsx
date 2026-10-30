@@ -657,13 +657,14 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
         <div className="dashboard-content">
           <div className="welcome-row">
             <div><p className="eyebrow">{dayLabel.toUpperCase()}</p><h1>{greeting}, {person.firstName}<span className="wave">✳</span></h1><p className="muted welcome-subtitle">{role === "admin" ? "Here's what's happening across your school." : role === "teacher" ? "Your classes and learners, all in one place." : "Your learning journey, all in one place."}</p></div>
+            {role === "admin" && activePage === "overview" && <button className="button button-primary create-button" type="button" onClick={() => setDialog("class")}><Plus size={17} />Create class</button>}
           </div>
 
           {error && <div className="error-banner" role="alert"><span>{error}</span><button className="button button-small" onClick={refresh}>Try again</button></div>}
           {notice && <div className="notice-banner" role="status"><Check size={17} />{notice}<button aria-label="Dismiss notification" onClick={() => setNotice("")}><X size={16} /></button></div>}
 
           {activePage === "overview" && <Overview role={role} data={data} loading={loading} onNavigate={setActivePage} onEnroll={() => setDialog("enroll")} onOpenClass={openClass} />}
-          {activePage === "classes" && <ClassesPage role={role} classes={visibleClasses} loading={loading} search={search} setSearch={setSearch} onEnroll={() => setDialog("enroll")} onOpenClass={openClass} />}
+          {activePage === "classes" && <ClassesPage role={role} classes={visibleClasses} loading={loading} search={search} setSearch={setSearch} onCreate={() => setDialog("class")} onEnroll={() => setDialog("enroll")} onOpenClass={openClass} />}
           {activePage === "timetable" && <TimetablePage role={role} classes={data.classes} attendance={data.attendance} loading={loading} onConfigure={configureTimetable} onReview={reviewTimetableRequest} onRecordAttendance={(session) => setAttendanceDialog(session)} />}
           {activePage === "courses" && <CoursesPage courses={data.courses} loading={loading} role={role} onCreate={() => setDialog("course")} />}
           {activePage === "people" && <PeoplePage role={role} data={data} loading={loading} onCreate={(type) => setDialog(type)} onOpenPerson={openPerson} search={search} setSearch={setSearch} />}
@@ -1038,10 +1039,10 @@ function AttendanceDialog({ session, onClose, onSubmit }) {
   );
 }
 
-function ClassesPage({ role, classes, loading, search, setSearch, onEnroll, onOpenClass }) {
+function ClassesPage({ role, classes, loading, search, setSearch, onCreate, onEnroll, onOpenClass }) {
   return (
     <>
-      <div className="page-heading"><div><p className="eyebrow">THE PEOPLE & PLACES</p><h2>Classes</h2><p className="muted">A home for curiosity, community, and a little bit of magic.</p></div><div className="search-control"><Search size={16} /><input aria-label="Search classes" placeholder="Find a class…" value={search} onChange={(event) => setSearch(event.target.value)} /></div></div>
+      <div className="page-heading"><div><p className="eyebrow">THE PEOPLE & PLACES</p><h2>Classes</h2><p className="muted">A home for curiosity, community, and a little bit of magic.</p></div><div className="classes-page-actions">{role === "admin" && <button className="button button-primary" onClick={onCreate}><Plus size={17} />Create class</button>}<div className="search-control"><Search size={16} /><input aria-label="Search classes" placeholder="Find a class…" value={search} onChange={(event) => setSearch(event.target.value)} /></div></div></div>
       {loading ? <LoadingCards /> : classes.length === 0 ? <EmptyState icon={School} title="No classes found" text={role === "admin" ? "Try another search or create a class to get started." : "No classes match your search. Try another name or course."} /> : <div className="class-grid class-grid-all">{classes.map((item, index) => <ClassCard key={item._id} schoolClass={item} index={index} onOpen={() => onOpenClass(item)} />)}</div>}
       {role === "admin" && <div className="inline-hint"><span className="hint-icon"><Users size={17} /></span><span><strong>Quick enrollment</strong><small>Add an existing student to one of your classes.</small></span><button className="text-button" onClick={onEnroll}>Enroll a student <ArrowRight size={15} /></button></div>}
     </>
