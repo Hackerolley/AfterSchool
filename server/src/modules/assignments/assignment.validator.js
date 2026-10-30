@@ -87,3 +87,8 @@ export const submitAssignmentSchema = z.object({
     context.addIssue({ code: "custom", path: ["linkUrl"], message: "A submission link is required" });
   }
 });
+
+export const reviewAssignmentSubmissionSchema = z.object({
+  score: z.number().int().min(0).max(100),
+  feedback: z.string().trim().max(4000).optional().default(""),
+}).strict();

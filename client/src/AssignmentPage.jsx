@@ -12,7 +12,7 @@ import {
   X,
   Youtube,
 } from "lucide-react";
-import { apiGet, apiPostForm, assignmentFileUrl } from "./api.js";
+import { apiGet, apiPatch, apiPostForm, assignmentFileUrl } from "./api.js";
 
 const contentLabels = {
   text: "Text assignment",
@@ -49,7 +49,16 @@ function dueLabel(date) {
   return `Due ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(due)}`;
 }
 
-export default function AssignmentPage({ role, assignments, classes, loading, organizationId, onRefresh }) {
+export default function AssignmentPage({
+  role,
+  assignments,
+  classes,
+  loading,
+  organizationId,
+  onRefresh,
+  selectedAssignmentId,
+  onAssignmentOpened,
+}) {
   const [selected, setSelected] = useState(null);
   const [submissions, setSubmissions] = useState([]);
   const [loadingSubmissions, setLoadingSubmissions] = useState(false);
@@ -88,6 +97,14 @@ export default function AssignmentPage({ role, assignments, classes, loading, or
     }
   }
 
+  useEffect(() => {
+    if (!selectedAssignmentId) return;
+    const assignment = assignments.find((item) => item._id === selectedAssignmentId);
+    if (!assignment) return;
+    void openAssignment(assignment);
+    onAssignmentOpened();
+  }, [assignments, selectedAssignmentId]);
+
   async function createAssignment(event) {
     event.preventDefault();
     setPending(true);
@@ -117,6 +134,26 @@ export default function AssignmentPage({ role, assignments, classes, loading, or
       await apiPostForm(`/assignments/${selected._id}/submissions`, form, organizationId);
       setSelected(await apiGet(`/assignments/${selected._id}`, organizationId).then((response) => response.data));
       await onRefresh();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function reviewSubmission(event, submission) {
+    event.preventDefault();
+    if (!selected) return;
+    setPending(true);
+    setError("");
+    const form = new FormData(event.currentTarget);
+    try {
+      const response = await apiPatch(
+        `/assignments/${selected._id}/submissions/${submission._id}/review`,
+        { score: Number(form.get("score")), feedback: String(form.get("feedback") || "") },
+        organizationId,
+      );
+      setSubmissions((current) => current.map((item) => item._id === submission._id ? response.data : item));
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -162,7 +199,7 @@ export default function AssignmentPage({ role, assignments, classes, loading, or
                 {assignment.contentType === "document" ? <FileText size={19} /> : assignment.contentType === "link" ? <LinkIcon size={19} /> : assignment.contentType === "youtube" ? <Youtube size={19} /> : <BookOpen size={19} />}
               </span>
               <div className="assignment-card-copy">
-                <div className="assignment-card-heading"><h3>{assignment.title}</h3><span className={`assignment-state ${assignment.submission ? "submitted" : ""}`}>{assignment.submission ? "Submitted" : contentLabels[assignment.contentType]}</span></div>
+                <div className="assignment-card-heading"><h3>{assignment.title}</h3><span className={`assignment-state ${assignment.submission ? "submitted" : ""}`}>{assignment.submission?.reviewedAt ? `Reviewed · ${assignment.submission.score}/100` : assignment.submission ? "Submitted" : contentLabels[assignment.contentType]}</span></div>
                 <p>{assignment.class?.name || "Class"}{assignment.class?.course?.name ? ` · ${assignment.class.course.name}` : ""}</p>
                 <small>{dueLabel(assignment.dueAt)}{assignment.submission?.submittedAt ? ` · Sent ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(new Date(assignment.submission.submittedAt))}` : ""}</small>
               </div>
@@ -208,6 +245,14 @@ export default function AssignmentPage({ role, assignments, classes, loading, or
             {error && <div className="form-error assignment-error" role="alert">{error}</div>}
 
             {role === "student" ? (
+              <>
+              {selected.submission?.reviewedAt && (
+                <section className="assignment-review" aria-label="Teacher review">
+                  <div className="assignment-review-heading"><h3>Your teacher’s review</h3><strong>{selected.submission.score}/100</strong></div>
+                  {selected.submission.feedback && <p>{selected.submission.feedback}</p>}
+                  <small>Reviewed {new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(selected.submission.reviewedAt))}</small>
+                </section>
+              )}
               <form className="modal-form assignment-submit-form" onSubmit={submitWork}>
                 <div className="assignment-submission-heading"><h3>Your submission</h3>{selected.submission?.isLate && <span className="assignment-state late">Submitted late</span>}</div>
                 {selected.submission?.attachment && <a className="assignment-file-link previous-file" href={assignmentFileUrl(selected._id, organizationId, selected.submission._id)} target="_blank" rel="noreferrer"><FileText size={17} /><span>{selected.submission.attachment.originalFilename}<small>Current uploaded file</small></span><ArrowDownToLine size={16} /></a>}
@@ -217,6 +262,7 @@ export default function AssignmentPage({ role, assignments, classes, loading, or
                 {submissionType === "link" && <label className="form-field"><span>Submission link</span><input name="linkUrl" type="url" required maxLength="2048" defaultValue={selected.submission?.submissionType === "link" ? selected.submission.linkUrl : ""} placeholder="https://…" /></label>}
                 <div className="modal-actions"><button className="button button-primary" type="submit" disabled={pending}>{pending ? "Submitting…" : selected.submission ? "Update submission" : "Submit work"}<Send size={15} /></button></div>
               </form>
+              </>
             ) : (
               <section className="assignment-submissions">
                 <div className="assignment-submission-heading"><h3>Student submissions</h3><span>{loadingSubmissions ? "Loading…" : submissions.length}</span></div>
@@ -226,6 +272,12 @@ export default function AssignmentPage({ role, assignments, classes, loading, or
                     {item.submissionType === "text" && <p>{item.contentText}</p>}
                     {item.submissionType === "link" && <a href={item.linkUrl} target="_blank" rel="noreferrer"><ExternalLink size={14} />Open student link</a>}
                     {item.attachment && <a href={assignmentFileUrl(selected._id, organizationId, item._id)} target="_blank" rel="noreferrer"><FileText size={14} />{item.attachment.originalFilename}</a>}
+                    <form className="submission-review-form" key={`${item._id}:${item.reviewedAt || "new"}`} onSubmit={(event) => reviewSubmission(event, item)}>
+                      <label className="form-field"><span>Score (out of 100)</span><input name="score" type="number" min="0" max="100" step="1" required defaultValue={item.score ?? ""} /></label>
+                      <label className="form-field"><span>Feedback <small>Optional</small></span><textarea name="feedback" rows="2" maxLength="4000" defaultValue={item.feedback || ""} placeholder="Share helpful feedback with the student." /></label>
+                      {item.reviewedAt && <small className="submission-reviewed-at">Last reviewed {new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(item.reviewedAt))}</small>}
+                      <button className="button button-primary button-small" type="submit" disabled={pending}>{pending ? "Saving…" : item.reviewedAt ? "Update review" : "Save review"}</button>
+                    </form>
                   </article>
                 ))}
               </section>

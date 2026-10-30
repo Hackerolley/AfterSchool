@@ -195,7 +195,18 @@ Attendance is recorded per scheduled class occurrence, not per student. Each occ
 | GET | `/assignments/:assignmentId/file` | Redirect to a short-lived, signed download for the assignment document. | Authorized class member |
 | POST | `/assignments/:assignmentId/submissions` | Submit or update a response as text, a PDF/Word/TXT document, or an HTTP(S) link. Late work is accepted and marked as late. Multipart form data is used for file submissions. | Student actively enrolled in the assignment's class |
 | GET | `/assignments/:assignmentId/submissions` | List student submissions for the assignment, including student names and submission details. | Teacher who created the assignment |
+| PATCH | `/assignments/:assignmentId/submissions/:submissionId/review` | Save or update a student's integer score from 0 to 100 and optional written feedback. Students can see the review with their submission; changing a submission clears its previous review. | Teacher who created the assignment |
 | GET | `/assignments/:assignmentId/submissions/:submissionId/file` | Redirect to a short-lived, signed download for a student's submitted document. | School admin, assigned teacher, or that student |
+
+### Notifications
+
+| Method | Endpoint | Purpose | Access |
+|---|---|---|---|
+| GET | `/notifications` | List recent school-scoped notifications and the unread count. | Active school member |
+| PATCH | `/notifications/:notificationId/read` | Mark one notification as read. | Its recipient |
+| PATCH | `/notifications/read-all` | Mark all notifications for the current member as read. | Active school member |
+
+New assignment submissions notify the assigned teacher; saved reviews notify the student. The dashboard bell links each notification to its assignment.
 
 ### School library
 

@@ -10,6 +10,7 @@ import assignmentRoutes from "../modules/assignments/assignment.routes.js";
 import libraryRoutes from "../modules/library/library.routes.js";
 import quranRoutes from "../modules/quran/quran.routes.js";
 import settingsRoutes from "../modules/settings/settings.routes.js";
+import notificationRoutes from "../modules/notifications/notification.routes.js";
 
 const router = Router();
 router.use("/auth", authRoutes);
@@ -22,6 +23,7 @@ router.use("/assignments", assignmentRoutes);
 router.use("/library", libraryRoutes);
 router.use("/quran", quranRoutes);
 router.use("/settings", settingsRoutes);
+router.use("/notifications", notificationRoutes);
 router.use("/platform/organizations", organizationRoutes);
 
 export default router;

@@ -56,6 +56,10 @@ const submissionSchema = new mongoose.Schema(
     linkUrl: { type: String, maxlength: 2048 },
     submittedAt: { type: Date, default: Date.now },
     isLate: { type: Boolean, default: false },
+    score: { type: Number, min: 0, max: 100 },
+    feedback: { type: String, trim: true, maxlength: 4000, default: "" },
+    reviewedAt: { type: Date },
+    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Membership" },
   },
   { timestamps: true, strict: "throw" },
 );

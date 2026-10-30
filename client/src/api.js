@@ -65,10 +65,9 @@ export async function getCsrfToken() {
   return token;
 }
 
-function csrfToken() {
+async function csrfToken() {
   const token = sessionStorage.getItem(CSRF_KEY);
-  if (!token) throw new ApiError("Your session has expired. Please sign in again.", 401);
-  return token;
+  return token || getCsrfToken();
 }
 
 export async function login({ mode, email, password, organizationSlug }) {
@@ -90,25 +89,28 @@ export function getPlatformSession() {
   return request("/auth/platform/me");
 }
 
-export function logout() {
-  return request("/auth/logout", { method: "POST", csrfToken: csrfToken() })
-    .finally(() => sessionStorage.removeItem(CSRF_KEY));
+export async function logout() {
+  try {
+    return await request("/auth/logout", { method: "POST", csrfToken: await csrfToken() });
+  } finally {
+    sessionStorage.removeItem(CSRF_KEY);
+  }
 }
 
 export function apiGet(path, organizationId) {
   return request(path, { organizationId });
 }
 
-export function apiPost(path, body, organizationId) {
-  return request(path, { method: "POST", body, organizationId, csrfToken: csrfToken() });
+export async function apiPost(path, body, organizationId) {
+  return request(path, { method: "POST", body, organizationId, csrfToken: await csrfToken() });
 }
 
-export function apiPostForm(path, body, organizationId) {
-  return request(path, { method: "POST", body, organizationId, csrfToken: csrfToken() });
+export async function apiPostForm(path, body, organizationId) {
+  return request(path, { method: "POST", body, organizationId, csrfToken: await csrfToken() });
 }
 
-export function apiPatchForm(path, body, organizationId) {
-  return request(path, { method: "PATCH", body, organizationId, csrfToken: csrfToken() });
+export async function apiPatchForm(path, body, organizationId) {
+  return request(path, { method: "PATCH", body, organizationId, csrfToken: await csrfToken() });
 }
 
 export function assignmentFileUrl(assignmentId, organizationId, submissionId) {
@@ -122,18 +124,18 @@ export function libraryEbookUrl(itemId, organizationId) {
   return `${API_URL}/library/${itemId}/file?organizationId=${encodeURIComponent(organizationId)}`;
 }
 
-export function apiPatch(path, body, organizationId) {
-  return request(path, { method: "PATCH", body, organizationId, csrfToken: csrfToken() });
+export async function apiPatch(path, body, organizationId) {
+  return request(path, { method: "PATCH", body, organizationId, csrfToken: await csrfToken() });
 }
 
-export function apiDelete(path, organizationId) {
-  return request(path, { method: "DELETE", organizationId, csrfToken: csrfToken() });
+export async function apiDelete(path, organizationId) {
+  return request(path, { method: "DELETE", organizationId, csrfToken: await csrfToken() });
 }
 
 export function quranGet(path, organizationId) {
   return request(`/quran${path}`, { organizationId });
 }
 
-export function quranPost(body, organizationId) {
-  return request("/quran/progress", { method: "POST", body, organizationId, csrfToken: csrfToken() });
+export async function quranPost(body, organizationId) {
+  return request("/quran/progress", { method: "POST", body, organizationId, csrfToken: await csrfToken() });
 }

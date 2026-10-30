@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import AssignmentPage from "./AssignmentPage.jsx";
 import LibraryPage from "./LibraryPage.jsx";
+import NotificationBell from "./NotificationBell.jsx";
 import QuranPage from "./QuranPage.jsx";
 import {
   apiGet,
@@ -413,6 +414,7 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
   const [details, setDetails] = useState(null);
   const [attendanceDialog, setAttendanceDialog] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [pendingAssignmentId, setPendingAssignmentId] = useState("");
   const role = auth.role;
   const orgId = auth.school.id;
   const person = auth.user;
@@ -537,6 +539,11 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
     refresh();
   }
 
+  function openNotifiedAssignment(assignmentId) {
+    setPendingAssignmentId(assignmentId);
+    setActivePage("assignments");
+  }
+
   const visibleClasses = data.classes.filter((item) => {
     const text = `${item.name} ${item.course?.name || ""} ${item.course?.code || ""}`.toLowerCase();
     return text.includes(search.toLowerCase());
@@ -571,7 +578,7 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
         <header className="topbar">
           <button className="icon-button menu-button" aria-label="Open navigation" onClick={() => setMobileNavOpen(true)}><Menu size={20} /></button>
           <div className="breadcrumbs"><span>Workspace</span><span className="crumb-divider">/</span><strong>{availableNavigation.find((item) => item.id === activePage)?.label}</strong></div>
-          <div className="topbar-right"><span className="date-label"><CalendarDays size={15} />{dayLabel}</span><span className="topbar-separator" /><Avatar user={person} className="avatar avatar-soft" /><button className="icon-button top-logout" title="Sign out" aria-label="Sign out" onClick={onLogout}><LogOut size={17} /></button></div>
+          <div className="topbar-right"><NotificationBell organizationId={orgId} onOpenAssignment={openNotifiedAssignment} /><span className="date-label"><CalendarDays size={15} />{dayLabel}</span><span className="topbar-separator" /><Avatar user={person} className="avatar avatar-soft" /><button className="icon-button top-logout" title="Sign out" aria-label="Sign out" onClick={onLogout}><LogOut size={17} /></button></div>
         </header>
 
         <div className="dashboard-content">
@@ -587,7 +594,7 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
           {activePage === "timetable" && <TimetablePage role={role} classes={data.classes} attendance={data.attendance} loading={loading} onConfigure={configureTimetable} onReview={reviewTimetableRequest} onRecordAttendance={(session) => setAttendanceDialog(session)} />}
           {activePage === "courses" && <CoursesPage courses={data.courses} loading={loading} role={role} onCreate={() => setDialog("course")} />}
           {activePage === "people" && <PeoplePage role={role} data={data} loading={loading} onCreate={(type) => setDialog(type)} onOpenPerson={openPerson} search={search} setSearch={setSearch} />}
-          {activePage === "assignments" && <AssignmentPage role={role} assignments={data.assignments} classes={data.classes} loading={loading} organizationId={orgId} onRefresh={refresh} />}
+          {activePage === "assignments" && <AssignmentPage role={role} assignments={data.assignments} classes={data.classes} loading={loading} organizationId={orgId} onRefresh={refresh} selectedAssignmentId={pendingAssignmentId} onAssignmentOpened={() => setPendingAssignmentId("")} />}
           {activePage === "library" && <LibraryPage role={role} items={data.library} loading={loading} organizationId={orgId} onRefresh={refresh} />}
           {activePage === "quran" && <QuranPage organizationId={orgId} studentName={fullName(person)} />}
           <footer className="content-footer"><span>© {new Date().getFullYear()} Afterschool</span><span>School, in sync.</span></footer>

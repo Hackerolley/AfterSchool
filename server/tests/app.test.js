@@ -21,6 +21,7 @@ import {
 import {
   canonicalYouTubeUrl,
   createAssignmentSchema,
+  reviewAssignmentSubmissionSchema,
   submitAssignmentSchema,
 } from "../src/modules/assignments/assignment.validator.js";
 import { privateDocumentUrl } from "../src/modules/assignments/cloudinary.service.js";
@@ -284,6 +285,21 @@ test("assignment submissions validate text, file, and link response requirements
     contentText: "My response",
     linkUrl: "https://example.com",
   }).success, false);
+});
+
+test("assignment reviews require an integer score from 0 to 100 and allow optional feedback", () => {
+  assert.deepEqual(reviewAssignmentSubmissionSchema.parse({ score: 85 }), { score: 85, feedback: "" });
+  assert.equal(reviewAssignmentSubmissionSchema.safeParse({ score: 0, feedback: "Good work" }).success, true);
+  assert.equal(reviewAssignmentSubmissionSchema.safeParse({ score: 100 }).success, true);
+  assert.equal(reviewAssignmentSubmissionSchema.safeParse({ score: 101 }).success, false);
+  assert.equal(reviewAssignmentSubmissionSchema.safeParse({ score: 75.5 }).success, false);
+  assert.equal(reviewAssignmentSubmissionSchema.safeParse({ score: "75" }).success, false);
+  assert.equal(reviewAssignmentSubmissionSchema.safeParse({ score: "not a score" }).success, false);
+  assert.equal(reviewAssignmentSubmissionSchema.safeParse({ score: 75, unexpected: true }).success, false);
+});
+
+test("notifications require an authenticated school member", async () => {
+  await request(makeApp()).get("/api/v1/notifications").expect(401);
 });
 
 test("class timetables accept weekly Google Meet sessions and reject unsafe or invalid entries", () => {

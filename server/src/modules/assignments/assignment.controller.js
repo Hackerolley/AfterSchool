@@ -4,6 +4,7 @@ import {
   Assignment,
   AssignmentSubmission,
 } from "./assignment.model.js";
+import { Notification } from "../notifications/notification.model.js";
 import {
   deleteDocument,
   privateDocumentUrl,
@@ -178,29 +179,42 @@ export async function submitAssignment(req, res) {
     isLate: Boolean(assignment.dueAt && Date.now() > assignment.dueAt.getTime()),
   };
 
+  const unset = {
+    score: 1,
+    feedback: 1,
+    reviewedAt: 1,
+    reviewedBy: 1,
+    ...(!attachment ? { attachment: 1 } : {}),
+    ...(req.body.submissionType !== "link" ? { linkUrl: 1 } : {}),
+    ...(req.body.submissionType !== "text" ? { contentText: 1 } : {}),
+  };
+  let submission;
   try {
-    const unset = {
-      ...(!attachment ? { attachment: 1 } : {}),
-      ...(req.body.submissionType !== "link" ? { linkUrl: 1 } : {}),
-      ...(req.body.submissionType !== "text" ? { contentText: 1 } : {}),
-    };
-    const submission = await AssignmentSubmission.findOneAndUpdate(
+    submission = await AssignmentSubmission.findOneAndUpdate(
       filter,
       {
         $set: update,
         $setOnInsert: filter,
-        ...(Object.keys(unset).length ? { $unset: unset } : {}),
+        $unset: unset,
       },
       { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true },
     ).lean();
-    if (previous?.attachment && (attachment || req.body.submissionType !== "file")) {
-      await deleteDocument(previous.attachment, req.app.locals.config);
-    }
-    res.status(previous ? 200 : 201).json({ success: true, data: safeSubmission(submission) });
   } catch (error) {
     if (attachment) await deleteDocument(attachment, req.app.locals.config);
     throw error;
   }
+  await Notification.create({
+    organization: req.organization._id,
+    recipient: assignment.teacher,
+    type: "assignment_submission",
+    assignment: assignment._id,
+    submission: submission._id,
+    message: `New submission from ${[req.user.firstName, req.user.lastName].filter(Boolean).join(" ") || "a student"}.`,
+  });
+  if (previous?.attachment && (attachment || req.body.submissionType !== "file")) {
+    await deleteDocument(previous.attachment, req.app.locals.config);
+  }
+  res.status(previous ? 200 : 201).json({ success: true, data: safeSubmission(submission) });
 }
 
 export async function listAssignmentSubmissions(req, res) {
@@ -218,6 +232,38 @@ export async function listAssignmentSubmissions(req, res) {
     .sort({ submittedAt: -1, _id: 1 })
     .lean();
   res.json({ success: true, data: submissions.map(safeSubmission) });
+}
+
+export async function reviewAssignmentSubmission(req, res) {
+  const assignment = await getVisibleAssignment(req);
+  if (req.membership.role !== "teacher") throw new HttpError(403, "Teacher permission required");
+  const submission = await AssignmentSubmission.findOneAndUpdate(
+    {
+      _id: req.params.submissionId,
+      organization: req.organization._id,
+      assignment: assignment._id,
+    },
+    {
+      $set: {
+        score: req.body.score,
+        feedback: req.body.feedback,
+        reviewedAt: new Date(),
+        reviewedBy: req.membership._id,
+      },
+    },
+    { new: true, runValidators: true },
+  ).lean();
+  if (!submission) throw new HttpError(404, "Student submission not found");
+
+  await Notification.create({
+    organization: req.organization._id,
+    recipient: submission.student,
+    type: "assignment_review",
+    assignment: assignment._id,
+    submission: submission._id,
+    message: `Your assignment was reviewed. Score: ${req.body.score}/100.`,
+  });
+  res.json({ success: true, data: safeSubmission(submission) });
 }
 
 export async function getAssignmentFile(req, res) {

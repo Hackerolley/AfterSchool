@@ -1241,3 +1241,52 @@ html[data-theme="dark"] .login-switch button.selected { color: #f0edf8; backgrou
   .settings-row { align-items: flex-start; }
   .settings-actions { flex-wrap: wrap; justify-content: flex-end; }
 }
+
+.notification-control { position: relative; }
+.notification-trigger { position: relative; width: 36px; height: 36px; color: #64746a; background: #f5f8f5; }
+.notification-badge { position: absolute; top: -3px; right: -4px; display: grid; min-width: 17px; height: 17px; place-items: center; padding: 0 4px; border: 2px solid #fff; border-radius: 20px; color: #fff; background: #c85c54; font-size: 8px; font-weight: 700; }
+.notification-popover { position: absolute; z-index: 20; top: calc(100% + 12px); right: -8px; width: min(360px, calc(100vw - 28px)); max-height: min(480px, calc(100vh - 90px)); overflow: hidden; border: 1px solid #e4e9e4; border-radius: 13px; background: #fff; box-shadow: 0 18px 48px #18271e25; }
+.notification-popover-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 14px; border-bottom: 1px solid #edf0ed; }
+.notification-popover-heading > div:first-child { display: grid; gap: 3px; }
+.notification-popover-heading strong { color: #34463a; font-size: 12px; }
+.notification-popover-heading small { color: #89968d; font-size: 9px; }
+.notification-popover-heading > div:last-child { display: flex; align-items: center; gap: 6px; }
+.notification-mark-all { display: inline-flex; align-items: center; gap: 4px; padding: 5px; border: 0; color: #477457; background: transparent; cursor: pointer; font-size: 9px; }
+.notification-list { max-height: 390px; overflow-y: auto; }
+.notification-item { display: grid; grid-template-columns: 8px minmax(0, 1fr); align-items: start; gap: 9px; width: 100%; padding: 11px 14px; border: 0; border-bottom: 1px solid #f0f2f0; text-align: left; background: #fff; cursor: pointer; }
+.notification-item:hover, .notification-unread { background: #f5faf6; }
+.notification-item-dot { width: 7px; height: 7px; margin-top: 4px; border-radius: 50%; background: transparent; }
+.notification-unread .notification-item-dot { background: #418161; }
+.notification-item > span:last-child { display: grid; gap: 4px; min-width: 0; }
+.notification-item strong { overflow: hidden; color: #3c4d42; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.notification-item small { color: #78867d; font-size: 9px; line-height: 1.45; }
+.notification-item time { color: #a0aaa3; font-size: 8px; }
+.notification-empty, .notification-error { margin: 0; padding: 17px 14px; color: #829087; font-size: 10px; line-height: 1.5; }
+.notification-error { color: #b94a48; }
+.submission-review-form { display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid #edf0ec; }
+.submission-review-form .form-field { gap: 5px; }
+.submission-review-form .form-field > span { font-size: 9px; }
+.submission-review-form .form-field input,
+.submission-review-form .form-field textarea { min-height: 33px; font-size: 10px; }
+.submission-reviewed-at { color: #819087; font-size: 9px; }
+.assignment-review { display: grid; gap: 8px; margin-top: 14px; padding: 13px; border: 1px solid #dceadd; border-radius: 10px; background: #f5faf5; }
+.assignment-review-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.assignment-review-heading h3 { margin: 0; color: #35473d; font: 700 12px var(--font-display); }
+.assignment-review-heading strong { color: #347451; font-size: 14px; }
+.assignment-review p { margin: 0; color: #5e7064; font-size: 10px; line-height: 1.6; white-space: pre-wrap; }
+.assignment-review small { color: #84938a; font-size: 9px; }
+html[data-theme="dark"] .notification-trigger { color: #ddd8e9; background: #302a42; }
+html[data-theme="dark"] .notification-popover { border-color: #49425a; background: #252135; }
+html[data-theme="dark"] .notification-popover-heading { border-color: #413a53; }
+html[data-theme="dark"] .notification-popover-heading strong,
+html[data-theme="dark"] .notification-item strong,
+html[data-theme="dark"] .assignment-review-heading h3 { color: #eeeaf6; }
+html[data-theme="dark"] .notification-item { border-color: #39334a; background: #252135; }
+html[data-theme="dark"] .notification-item:hover,
+html[data-theme="dark"] .notification-unread { background: #302a42; }
+html[data-theme="dark"] .assignment-review { border-color: #425747; background: #252f2c; }
+html[data-theme="dark"] .assignment-review p { color: #c1cbbf; }
+
+@media (max-width: 650px) {
+  .notification-popover { right: -74px; }
+}

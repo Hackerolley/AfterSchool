@@ -14,7 +14,9 @@ const parser = multer({
   limits: { fileSize: 10 * 1024 * 1024, files: 1 },
   fileFilter(req, file, callback) {
     const extension = extname(file.originalname).toLowerCase();
-    if (allowedTypes.get(extension) !== file.mimetype) {
+    const mimeTypeMatches = allowedTypes.get(extension) === file.mimetype
+      || (extension === ".pdf" && ["", "application/octet-stream", "application/x-pdf"].includes(file.mimetype));
+    if (!mimeTypeMatches) {
       callback(new HttpError(400, "Upload a PDF, Word document, or plain-text file"));
       return;
     }
@@ -24,6 +26,11 @@ const parser = multer({
 
 export function uploadAssignmentFile(req, res, next) {
   parser.single("file")(req, res, (error) => {
+    if (!error && req.file && extname(req.file.originalname).toLowerCase() === ".pdf"
+      && !req.file.buffer.subarray(0, 5).equals(Buffer.from("%PDF-"))) {
+      next(new HttpError(400, "The uploaded document is not a valid PDF file"));
+      return;
+    }
     if (!error) {
       next();
       return;

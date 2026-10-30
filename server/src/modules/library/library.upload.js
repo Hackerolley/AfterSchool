@@ -6,7 +6,10 @@ const parser = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 25 * 1024 * 1024, files: 1 },
   fileFilter(req, file, callback) {
-    if (extname(file.originalname).toLowerCase() !== ".pdf" || file.mimetype !== "application/pdf") {
+    if (
+      extname(file.originalname).toLowerCase() !== ".pdf"
+      || !["", "application/pdf", "application/octet-stream", "application/x-pdf"].includes(file.mimetype)
+    ) {
       callback(new HttpError(400, "Upload an ebook as a PDF file"));
       return;
     }

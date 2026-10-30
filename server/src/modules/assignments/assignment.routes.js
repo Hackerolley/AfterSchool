@@ -8,10 +8,12 @@ import {
   getAssignmentFile,
   listAssignmentSubmissions,
   listAssignments,
+  reviewAssignmentSubmission,
   submitAssignment,
 } from "./assignment.controller.js";
 import {
   createAssignmentSchema,
+  reviewAssignmentSubmissionSchema,
   submitAssignmentSchema,
 } from "./assignment.validator.js";
 import { uploadAssignmentFile } from "./assignment.upload.js";
@@ -43,6 +45,12 @@ router.get(
   "/:assignmentId/submissions",
   authorize("teacher"),
   asyncHandler(listAssignmentSubmissions),
+);
+router.patch(
+  "/:assignmentId/submissions/:submissionId/review",
+  authorize("teacher"),
+  validate(reviewAssignmentSubmissionSchema),
+  asyncHandler(reviewAssignmentSubmission),
 );
 router.get("/:assignmentId/submissions/:submissionId/file", asyncHandler(getAssignmentFile));
 router.get("/:assignmentId/file", asyncHandler(getAssignmentFile));
