@@ -15,7 +15,7 @@ React + Vite web client for the AfterSchool API. It includes school and platform
 
 3. Open the Vite URL shown in the terminal (normally `http://localhost:5173`).
 
-The Vite development server proxies `/api` to `http://localhost:4000` by default. This keeps browser API requests same-origin, including when opening the frontend at `localhost` or `127.0.0.1`, and lets the server-managed HTTP-only session cookie work without a development CORS mismatch. Set `VITE_API_URL` if the API is hosted somewhere else; when using a direct cross-origin URL, the backend's `CLIENT_ORIGINS` must allow the exact frontend origin. Browser requests include credentials so the HTTP-only session cookie is sent automatically.
+The Vite development server proxies `/api` to `http://localhost:4000` by default. This keeps browser API requests same-origin, including when opening the frontend at `localhost` or `127.0.0.1`, and lets the server-managed HTTP-only session cookie work without a development CORS mismatch. Set `VITE_API_URL` if the API is hosted somewhere else; when using a direct cross-origin URL, the backend's `CLIENT_ORIGINS` must allow the exact frontend origin. Browser requests include credentials so the HTTP-only session cookie is sent automatically. Production defaults to secure, partitioned cross-site cookies; for reliable iPhone Safari sign-in, keep the frontend and API on the same site or proxy `/api` through the frontend's domain because Safari may block third-party cookies.
 
 ## Included screens
 

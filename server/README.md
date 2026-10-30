@@ -17,6 +17,8 @@ npm run dev
 
 Configuration is loaded from `server/.env` or the workspace-root `.env` (the server-local file takes precedence). Set `MONGODB_URI` and replace `SESSION_SECRET` with a randomly generated value of at least 32 characters before starting. Add the deployed browser application's exact origin to `CLIENT_ORIGINS` (comma-separated when there is more than one). In production, serve the API over HTTPS and configure `TRUST_PROXY` for the actual reverse proxy.
 
+Production defaults to `COOKIE_SAME_SITE=none` for cross-origin browser clients. This sends the session cookie with credentialed API requests using `Secure` and `Partitioned` cookie attributes; set `TRUST_PROXY=1` when running behind one trusted HTTPS proxy (or configure the actual proxy depth). If Safari still rejects login cookies because the API is treated as a third party, host the client and API on the same site, such as `app.example.com` and `api.example.com`, or proxy `/api` through the client domain. Safari's cross-site tracking protections can block third-party cookies even when `SameSite=None` is set.
+
 The API listens on port 4000 by default. `GET /api/v1/health` reports application and MongoDB connectivity.
 
 Assignment documents and library ebooks require a Cloudinary account. Add these variables to `server/.env` (or the workspace-root `.env`, which the server also loads):

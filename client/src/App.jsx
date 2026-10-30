@@ -487,25 +487,27 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
     if (type === "student" || type === "teacher") {
       const path = type === "student" ? "/students" : "/teachers";
       await apiPost(path, { ...body, role: type }, orgId);
-      showNotice(`${type === "student" ? "Student" : "Teacher"} added to your school.`);
     } else if (type === "course") {
       await apiPost("/courses", body, orgId);
-      showNotice("Course created.");
     } else if (type === "class") {
       await apiPost("/classes", body, orgId);
-      showNotice("Class created.");
     } else if (type === "timetable") {
       await apiPatch(`/classes/${body.classId}/timetable`, { timetable: body.timetable }, orgId);
-      showNotice("Class timetable saved.");
     } else if (type === "timetable-request") {
       await apiPost(`/classes/${body.classId}/timetable-requests`, { timetable: body.timetable }, orgId);
-      showNotice("Timetable change sent to the school admin for approval.");
     } else if (type === "enroll") {
       await apiPost(`/classes/${body.classId}/enrollments`, { studentMembershipId: body.studentMembershipId }, orgId);
-      showNotice("Student enrolled in class.");
     }
-    setDialog("");
     refresh();
+    return {
+      student: "The student has been added to your school.",
+      teacher: "The teacher has been added to your school.",
+      course: "The course has been created.",
+      class: "The class has been created.",
+      timetable: "The class timetable has been saved.",
+      "timetable-request": "The timetable change has been sent to the school admin for approval.",
+      enroll: "The student has been enrolled in the class.",
+    }[type];
   }
   async function saveAttendance(session) {
     await apiPost(`/classes/${session.classId}/attendance`, {
@@ -1109,13 +1111,12 @@ function PlatformDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogo
         slug: body.slug,
         admin: body.admin,
       });
-      setNotice(`“${result.data.organization.name}” is ready. Its school administrator can now sign in.`);
-      setDialog(false);
       setSelectedSchoolId(String(result.data.organization.id));
       setSchoolPage(1);
       setSchoolSearch("");
       setSchoolStatus("");
       setRefreshKey((value) => value + 1);
+      return `“${result.data.organization.name}” is ready. Its school administrator can now sign in.`;
     } catch (requestError) {
       setError(requestError.message);
       throw requestError;
@@ -1300,7 +1301,7 @@ function EditOrganizationDialog({ organization, onClose, onSubmit }) {
   );
 }
 
-function ActionDialog({ type, initialClassId = "", courses = [], teachers = [], students = [], classes = [], onClose, onSubmit, pending = false }) {
+function ActionDialog({ type, initialClassId = "", courses = [], teachers = [], students = [], classes = [], onClose, onSubmit }) {
   const config = {
     student: { title: "Welcome a student", subtitle: "Create their account and student profile.", button: "Add student" },
     teacher: { title: "Welcome a teacher", subtitle: "Create their account and teaching profile.", button: "Add teacher" },
@@ -1312,6 +1313,8 @@ function ActionDialog({ type, initialClassId = "", courses = [], teachers = [], 
     organization: { title: "Create a school", subtitle: "Set up a workspace and its first administrator.", button: "Create school" },
   }[type];
   const [formError, setFormError] = useState("");
+  const [pending, setPending] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
   const startingClassId = initialClassId || classes[0]?._id || "";
   const [selectedClass, setSelectedClass] = useState(startingClassId);
   const [timetable, setTimetable] = useState(() => {
@@ -1337,6 +1340,7 @@ function ActionDialog({ type, initialClassId = "", courses = [], teachers = [], 
   async function submit(event) {
     event.preventDefault();
     setFormError("");
+    setPending(true);
     const formData = new FormData(event.currentTarget);
     const value = (key) => String(formData.get(key) || "").trim();
     const body = { type };
@@ -1387,16 +1391,27 @@ function ActionDialog({ type, initialClassId = "", courses = [], teachers = [], 
       };
     }
     try {
-      await onSubmit(body);
+      const message = await onSubmit(body);
+      setSuccessMessage(message || "Your changes have been saved.");
     } catch (error) {
       setFormError(error.message);
+    } finally {
+      setPending(false);
     }
   }
 
   return (
-    <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !pending) onClose(); }}>
       <section className="modal" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
-        <div className="modal-heading"><div><p className="eyebrow">SCHOOL WORKSPACE</p><h2 id="dialog-title">{config.title}</h2><p>{config.subtitle}</p></div><button className="icon-button modal-close" aria-label="Close dialog" onClick={onClose}><X size={19} /></button></div>
+        <div className="modal-heading"><div><p className="eyebrow">SCHOOL WORKSPACE</p><h2 id="dialog-title">{successMessage ? "Successfully saved" : config.title}</h2><p>{successMessage ? "Everything is up to date." : config.subtitle}</p></div><button className="icon-button modal-close" aria-label="Close dialog" disabled={pending} onClick={onClose}><X size={19} /></button></div>
+        {successMessage ? (
+          <div className="action-success" role="status">
+            <span className="action-success-icon"><Check size={25} /></span>
+            <h3>All done</h3>
+            <p>{successMessage}</p>
+            <button className="button button-primary" type="button" onClick={onClose}>Done<ArrowRight size={16} /></button>
+          </div>
+        ) : (
         <form className="modal-form" onSubmit={submit}>
           {(type === "student" || type === "teacher") && <>
             <div className="form-two"><FormField label="First name"><input autoFocus required name="firstName" autoComplete="given-name" /></FormField><FormField label="Last name"><input required name="lastName" autoComplete="family-name" /></FormField></div>
@@ -1471,8 +1486,9 @@ function ActionDialog({ type, initialClassId = "", courses = [], teachers = [], 
           </>}
           {type === "organization" && <><div className="form-two"><FormField label="School name"><input autoFocus required name="name" maxLength="120" placeholder="e.g. Northfield Academy" /></FormField><FormField label="School slug"><input required name="slug" maxLength="80" pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="northfield-academy" /><small>Used when school members sign in.</small></FormField></div><div className="form-section-title">FIRST SCHOOL ADMIN</div><div className="form-two"><FormField label="First name"><input required name="adminFirstName" /></FormField><FormField label="Last name"><input required name="adminLastName" /></FormField></div><FormField label="Admin email"><input required type="email" name="adminEmail" /></FormField><FormField label="Temporary password"><input required minLength="12" maxLength="128" type="password" name="adminPassword" autoComplete="new-password" /><small>At least 12 characters. Share it securely with the administrator.</small></FormField></>}
           {formError && <div className="form-error" role="alert">{formError}</div>}
-          <div className="modal-actions"><button className="button button-quiet" type="button" onClick={onClose}>Cancel</button><button className="button button-primary" type="submit" disabled={pending || (type === "class" && (!courses.length || !teachers.length)) || (type === "enroll" && (!classes.length || !students.length)) || ((type === "timetable" || type === "timetable-request") && !classes.length)}>{pending ? <><span className="spinner" />Saving…</> : <>{config.button}<ArrowRight size={16} /></>}</button></div>
+          <div className="modal-actions"><button className="button button-quiet" type="button" disabled={pending} onClick={onClose}>Cancel</button><button className="button button-primary" type="submit" disabled={pending || (type === "class" && (!courses.length || !teachers.length)) || (type === "enroll" && (!classes.length || !students.length)) || ((type === "timetable" || type === "timetable-request") && !classes.length)}>{pending ? <><span className="spinner" />{type === "student" ? "Adding student…" : type === "teacher" ? "Adding teacher…" : type === "course" ? "Creating course…" : type === "class" ? "Creating class…" : "Saving…"}</> : <>{config.button}<ArrowRight size={16} /></>}</button></div>
         </form>
+        )}
       </section>
     </div>
   );

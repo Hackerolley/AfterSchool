@@ -3,11 +3,19 @@ import { HttpError } from "../utils/http-error.js";
 
 const safeMethods = new Set(["GET", "HEAD", "OPTIONS"]);
 
-export function issueCsrfToken(req, res) {
+export function issueCsrfToken(req, res, next) {
   if (!req.session.csrfToken) {
     req.session.csrfToken = randomBytes(32).toString("hex");
   }
-  res.json({ success: true, data: { csrfToken: req.session.csrfToken } });
+  const csrfToken = req.session.csrfToken;
+  res.set("Cache-Control", "no-store");
+  req.session.save((error) => {
+    if (error) {
+      next(error);
+      return;
+    }
+    res.json({ success: true, data: { csrfToken } });
+  });
 }
 
 export function csrfProtection(req, res, next) {

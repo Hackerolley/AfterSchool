@@ -30,7 +30,7 @@ import { updateProgressSchema } from "../src/modules/quran/quran.validator.js";
 import { clearQuranTokenCache, fetchQuranContent } from "../src/modules/quran/quran.service.js";
 import { isSupportedImage } from "../src/modules/settings/settings.upload.js";
 
-function makeApp() {
+function makeApp(configOverrides = {}) {
   return createApp({
     config: {
       NODE_ENV: "test",
@@ -39,6 +39,7 @@ function makeApp() {
       COOKIE_SAME_SITE: "lax",
       clientOrigins: ["http://localhost:5173"],
       trustProxy: 0,
+      ...configOverrides,
     },
     sessionStore: new session.MemoryStore(),
     getDatabaseState: () => "connected",
@@ -404,6 +405,7 @@ test("unsafe requests require a session CSRF token", async () => {
 test("CSRF token is session-bound and request validation runs afterward", async () => {
   const agent = request.agent(makeApp());
   const tokenResponse = await agent.get("/api/v1/auth/csrf").expect(200);
+  assert.equal(tokenResponse.headers["cache-control"], "no-store");
   const token = tokenResponse.body.data.csrfToken;
   assert.match(token, /^[a-f\d]{64}$/);
 
@@ -413,6 +415,22 @@ test("CSRF token is session-bound and request validation runs afterward", async 
     .send({ email: "invalid", password: "x", organizationId: "invalid" })
     .expect(400);
   assert.equal(response.body.message, "Request validation failed");
+});
+
+test("cross-site session cookies are secure, partitioned, and usable for CSRF login", async () => {
+  const agent = request.agent(makeApp({
+    NODE_ENV: "production",
+    COOKIE_SAME_SITE: "none",
+    trustProxy: 1,
+  }));
+  const tokenResponse = await agent
+    .get("/api/v1/auth/csrf")
+    .set("X-Forwarded-Proto", "https")
+    .expect(200);
+  const cookie = tokenResponse.headers["set-cookie"].join("; ");
+  assert.match(cookie, /SameSite=None/i);
+  assert.match(cookie, /Secure/i);
+  assert.match(cookie, /Partitioned/i);
 });
 
 test("CSRF validation rejects non-ASCII tokens without throwing", async () => {

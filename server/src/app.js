@@ -46,6 +46,7 @@ export function createApp({ config, sessionStore, getDatabaseState }) {
       httpOnly: true,
       secure: config.NODE_ENV === "production" || config.COOKIE_SAME_SITE === "none",
       sameSite: config.COOKIE_SAME_SITE,
+      partitioned: config.COOKIE_SAME_SITE === "none",
       maxAge: config.SESSION_MAX_AGE_MS,
       path: "/",
     },

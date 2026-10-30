@@ -12,7 +12,7 @@ const envSchema = z.object({
   MONGODB_URI: z.string().min(1),
   SESSION_SECRET: z.string().min(32),
   CLIENT_ORIGINS: z.string().default("http://localhost:5173"),
-  COOKIE_SAME_SITE: z.enum(["lax", "strict", "none"]).default("lax"),
+  COOKIE_SAME_SITE: z.enum(["lax", "strict", "none"]).optional(),
   SESSION_MAX_AGE_MS: z.coerce.number().int().positive().default(7 * 24 * 60 * 60 * 1000),
   TRUST_PROXY: z.union([z.literal("true"), z.string().regex(/^\d+$/)]).default("0"),
   CLOUDINARY_CLOUD_NAME: z.string().default(""),
@@ -32,6 +32,8 @@ if (!parsed.success) {
 const { CLIENT_ORIGINS, TRUST_PROXY, ...values } = parsed.data;
 export const config = Object.freeze({
   ...values,
+  COOKIE_SAME_SITE: parsed.data.COOKIE_SAME_SITE
+    ?? (parsed.data.NODE_ENV === "production" ? "none" : "lax"),
   clientOrigins: CLIENT_ORIGINS.split(",").map((origin) => origin.trim()).filter(Boolean),
   trustProxy: TRUST_PROXY === "true" ? 1 : Number(TRUST_PROXY),
 });

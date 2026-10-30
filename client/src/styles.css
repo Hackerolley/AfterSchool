@@ -495,6 +495,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .form-section-title { display: flex; align-items: center; gap: 8px; margin: 4px 0 -3px; padding-top: 11px; border-top: 1px solid #eef1ed; color: #74847a; font-size: 8px; font-weight: 700; letter-spacing: 1px; }
 .form-section-title span { color: #a7b0aa; font-size: 7px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 13px; border-top: 1px solid #eef1ed; }
+.action-success { display: grid; justify-items: center; gap: 10px; padding: 27px 8px 7px; text-align: center; }
+.action-success-icon { display: grid; width: 58px; height: 58px; place-items: center; border: 1px solid #d6e9da; border-radius: 50%; color: #43835a; background: #eff8ef; animation: success-pop .28s ease both; }
+@keyframes success-pop { from { opacity: 0; transform: scale(.75); } to { opacity: 1; transform: scale(1); } }
+.action-success h3 { margin: 0; color: #304638; font: 700 17px var(--font-display); }
+.action-success p { max-width: 360px; margin: 0 0 8px; color: #78867d; font-size: 11px; line-height: 1.6; }
+.action-success .button { min-width: 115px; }
 .details-modal { width: min(100%, 560px); }
 .details-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 17px 0; }
 .detail-item { display: grid; gap: 5px; min-width: 0; padding: 11px; border: 1px solid #edf0ec; border-radius: 8px; background: #fbfcfa; }
@@ -1215,6 +1221,8 @@ html[data-theme="dark"] .modal { border-color: #49425a; color: #eeeaf6; backgrou
 html[data-theme="dark"] .modal h2,
 html[data-theme="dark"] .settings-heading h2,
 html[data-theme="dark"] .settings-identity strong { color: #f0edf8; }
+html[data-theme="dark"] .action-success h3 { color: #f0edf8; }
+html[data-theme="dark"] .action-success-icon { border-color: #425747; color: #a4d5ad; background: #2b3c32; }
 html[data-theme="dark"] .settings-heading,
 html[data-theme="dark"] .settings-row { border-color: #413a53; }
 html[data-theme="dark"] .quran-panel,
