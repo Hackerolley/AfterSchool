@@ -375,12 +375,17 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .submission-row p { margin: 0; color: #65746a; font-size: 10px; line-height: 1.6; white-space: pre-wrap; }
 .submission-row a { display: inline-flex; align-items: center; gap: 6px; color: #477457; font-size: 10px; text-decoration: none; overflow-wrap: anywhere; }
 .people-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
+.people-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .segmented { display: inline-flex; gap: 3px; padding: 3px; border: 1px solid #e6eae5; border-radius: 8px; background: #f9faf8; }
 .segmented button { display: inline-flex; align-items: center; gap: 7px; padding: 7px 9px; border: 0; border-radius: 6px; color: #859188; background: transparent; cursor: pointer; font-size: 9px; font-weight: 600; }
 .segmented button.active { color: #3c6d4e; background: white; box-shadow: 0 1px 5px #2b40300d; }
 .segmented button span { color: #93a097; font-size: 8px; }
 .person-row { display: flex; align-items: center; gap: 11px; min-height: 61px; padding: 9px 14px; border-bottom: 1px solid #eff2ef; }
 .person-action { flex: 0 0 auto; }
+.people-row-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 5px; }
+.people-row-actions > button:not(.icon-button) { min-height: 31px; padding: 0 9px; border: 1px solid #e5eaf1; border-radius: 7px; color: #355a83; background: #fff; cursor: pointer; font-size: 10px; font-weight: 650; }
+.people-row-actions > button:not(.icon-button):hover { border-color: #b9d8f6; color: #0c2e67; background: #f4f9ff; }
+.people-status-filter { background: #fff; }
 .person-avatar { width: 33px; height: 33px; }
 .person-tone-0 { color: #537353; background: #e4eee2; }
 .person-tone-1 { color: #a17151; background: #f6e9dc; }
@@ -393,6 +398,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .person-detail { min-width: 95px; color: #89958d; font-size: 9px; }
 .status-pill { padding: 4px 7px; border-radius: 5px; color: #668b6b; background: #edf5eb; font-size: 8px; text-transform: capitalize; }
 .status-pill.inactive { color: #9a7e54; background: #f7f1e5; }
+.status-pill.suspended { color: #9c4e47; background: #fff0ee; }
 .person-action { width: 28px; height: 28px; }
 .empty-state { display: flex; flex-direction: column; align-items: center; padding: 48px 20px; border: 1px dashed #dce4dc; border-radius: 12px; background: #ffffffa8; text-align: center; }
 .empty-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; color: #5e8a67; background: #eaf2e8; }
@@ -1656,6 +1662,11 @@ html[data-theme="dark"] .nav-item.nav-active { color: #b9dcff; background: #1235
   .management-filter button { flex: 1; }
   .course-row { flex-wrap: wrap; }
   .course-row .management-actions { width: 100%; justify-content: flex-end; }
+  .people-filters { width: 100%; }
+  .people-filters .segmented { flex: 1; justify-content: center; }
+  .people-filters .segmented button { flex: 1; justify-content: center; }
+  .people-row-actions { flex-basis: 100%; justify-content: flex-end; }
+  .people-row-actions > button:not(.icon-button) { min-height: 36px; padding: 0 12px; }
 }
 .password-change-backdrop { z-index: 80; }
 .password-change-modal { width: min(100%, 440px); }

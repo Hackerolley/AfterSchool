@@ -2,6 +2,7 @@ import { z } from "zod";
 
 const passwordSchema = z.string().min(12).max(128);
 const optionalString = (max) => z.string().trim().max(max).optional();
+const nullableOptionalString = (max) => z.string().trim().max(max).nullable().optional();
 const studentPhoneSchema = z.string()
   .trim()
   .max(30)
@@ -85,6 +86,37 @@ export const createUserSchema = z.object({
 export const updateUserStatusSchema = z.object({
   status: z.enum(["active", "inactive", "suspended"]),
 }).strict();
+
+export const resetUserPasswordSchema = z.object({
+  newPassword: passwordSchema,
+}).strict();
+
+const updateIdentityFields = {
+  firstName: z.string().trim().min(1).max(80).optional(),
+  lastName: z.string().trim().min(1).max(80).optional(),
+  email: z.string().email().max(254).transform((value) => value.trim().toLowerCase()).optional(),
+};
+
+export const updateStudentSchema = z.object({
+  ...updateIdentityFields,
+  studentNumber: nullableOptionalString(40),
+  dateOfBirth: studentDateOfBirthSchema.nullable(),
+  gender: z.enum(["female", "male", "non_binary", "self_described", "prefer_not_to_say"]).nullable().optional(),
+  genderDescription: nullableOptionalString(80),
+  countryOfResidence: countryCodeSchema.nullable(),
+  homeCountry: countryCodeSchema.nullable(),
+  phoneNumber: studentPhoneSchema.nullable(),
+  guardianName: nullableOptionalString(160),
+  guardianEmail: z.string().email().max(254).nullable().optional(),
+  guardianPhone: nullableOptionalString(40),
+}).strict().refine((value) => Object.keys(value).length > 0, "Provide at least one field to update");
+
+export const updateTeacherSchema = z.object({
+  ...updateIdentityFields,
+  employeeId: nullableOptionalString(40),
+  qualifications: z.array(z.string().trim().min(1).max(120)).max(30).optional(),
+  specialization: nullableOptionalString(120),
+}).strict().refine((value) => Object.keys(value).length > 0, "Provide at least one field to update");
 
 export const listUsersQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),

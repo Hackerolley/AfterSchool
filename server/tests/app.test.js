@@ -13,7 +13,12 @@ import {
   updateOrganizationSchema,
   updatePlatformMembershipStatusSchema,
 } from "../src/modules/organizations/organization.validator.js";
-import { createUserSchema } from "../src/modules/users/user.validator.js";
+import {
+  createUserSchema,
+  resetUserPasswordSchema,
+  updateStudentSchema,
+  updateTeacherSchema,
+} from "../src/modules/users/user.validator.js";
 import {
   listAttendanceQuerySchema,
   recordAttendanceSchema,
@@ -459,6 +464,18 @@ test("student password change requires an authenticated school membership and CS
     .expect(401);
 });
 
+test("admin password reset requires an authenticated school administrator and CSRF", async () => {
+  const agent = request.agent(makeApp());
+  const csrfResponse = await agent.get("/api/v1/auth/csrf").expect(200);
+  const response = await agent
+    .patch("/api/v1/users/507f1f77bcf86cd799439011/password")
+    .set("X-Organization-Id", "507f1f77bcf86cd799439012")
+    .set("X-CSRF-Token", csrfResponse.body.data.csrfToken)
+    .send({ newPassword: "a-secure-new-password" })
+    .expect(401);
+  assert.equal(response.body.message, "Authentication required");
+});
+
 test("CSRF token is session-bound and request validation runs afterward", async () => {
   const agent = request.agent(makeApp());
   const tokenResponse = await agent.get("/api/v1/auth/csrf").expect(200);
@@ -583,6 +600,44 @@ test("self-described gender requires a description and student-only fields are r
       role: "teacher",
       dateOfBirth: "2012-04-15",
     }).success,
+    false,
+  );
+});
+
+test("student and teacher profile updates accept only their own editable fields", () => {
+  const student = updateStudentSchema.safeParse({
+    firstName: "Ada",
+    email: "ADA@example.com",
+    studentNumber: null,
+    dateOfBirth: null,
+    gender: null,
+    phoneNumber: null,
+    countryOfResidence: "gb",
+  });
+  assert.equal(student.success, true);
+  assert.equal(student.data.email, "ada@example.com");
+  assert.equal(student.data.countryOfResidence, "GB");
+  assert.equal(student.data.studentNumber, null);
+  assert.equal(student.data.dateOfBirth, null);
+  assert.equal(updateStudentSchema.safeParse({ specialization: "Science" }).success, false);
+  assert.equal(updateStudentSchema.safeParse({}).success, false);
+
+  const teacher = updateTeacherSchema.safeParse({
+    lastName: "Example",
+    qualifications: ["B.Ed."],
+    specialization: null,
+  });
+  assert.equal(teacher.success, true);
+  assert.deepEqual(teacher.data.qualifications, ["B.Ed."]);
+  assert.equal(updateTeacherSchema.safeParse({ guardianName: "Parent" }).success, false);
+  assert.equal(updateTeacherSchema.safeParse({}).success, false);
+});
+
+test("admin password resets require a strong replacement password and reject extra fields", () => {
+  assert.equal(resetUserPasswordSchema.safeParse({ newPassword: "a-secure-new-password" }).success, true);
+  assert.equal(resetUserPasswordSchema.safeParse({ newPassword: "short" }).success, false);
+  assert.equal(
+    resetUserPasswordSchema.safeParse({ newPassword: "a-secure-new-password", mustChangePassword: false }).success,
     false,
   );
 });

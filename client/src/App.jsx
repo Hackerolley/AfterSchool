@@ -414,7 +414,7 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [data, setData] = useState({ classes: [], archivedClasses: [], courses: [], archivedCourses: [], students: [], teachers: [], assignments: [], attendance: [], library: [] });
+  const [data, setData] = useState({ classes: [], archivedClasses: [], courses: [], archivedCourses: [], students: [], inactiveStudents: [], teachers: [], inactiveTeachers: [], assignments: [], attendance: [], library: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dialog, setDialog] = useState("");
@@ -426,6 +426,7 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
   const [attendanceDialog, setAttendanceDialog] = useState(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [pendingAssignmentId, setPendingAssignmentId] = useState("");
+  const [passwordResetPerson, setPasswordResetPerson] = useState(null);
   const role = auth.role;
   const orgId = auth.school.id;
   const person = auth.user;
@@ -494,7 +495,9 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
     }
     if (role === "admin") {
       jobIndexes.students = jobs.push(apiGet("/students?limit=100", orgId)) - 1;
+      jobIndexes.inactiveStudents = jobs.push(apiGet("/students?status=non-active&limit=100", orgId)) - 1;
       jobIndexes.teachers = jobs.push(apiGet("/teachers?limit=100", orgId)) - 1;
+      jobIndexes.inactiveTeachers = jobs.push(apiGet("/teachers?status=non-active&limit=100", orgId)) - 1;
     }
     if (role === "teacher") {
       jobIndexes.students = jobs.push(apiGet("/students?limit=100", orgId)) - 1;
@@ -511,7 +514,9 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
           library: results[3]?.data || [],
           attendance: jobIndexes.attendance !== undefined ? results[jobIndexes.attendance]?.data || [] : [],
           students: jobIndexes.students !== undefined ? results[jobIndexes.students]?.data || [] : [],
+          inactiveStudents: jobIndexes.inactiveStudents !== undefined ? results[jobIndexes.inactiveStudents]?.data || [] : [],
           teachers: jobIndexes.teachers !== undefined ? results[jobIndexes.teachers]?.data || [] : [],
+          inactiveTeachers: jobIndexes.inactiveTeachers !== undefined ? results[jobIndexes.inactiveTeachers]?.data || [] : [],
         });
       })
       .catch((requestError) => {
@@ -547,12 +552,27 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
     setNotice(text);
     window.setTimeout(() => setNotice(""), 3500);
   };
+  async function updatePersonStatus(item, status) {
+    const action = status === "active" ? "restored" : "deactivated";
+    if (status !== "active" && !window.confirm(`Deactivate ${fullName(item.user)}? Their school access will be suspended, and their records will be kept.`)) return;
+    try {
+      await apiPatch(`/users/${item._id}/status`, { status }, orgId);
+      setError("");
+      showNotice(`${fullName(item.user)} has been ${action}.`);
+      refresh();
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }
 
   async function submitCreate(payload) {
     const { type, ...body } = payload;
     if (type === "student" || type === "teacher") {
       const path = type === "student" ? "/students" : "/teachers";
       await apiPost(path, { ...body, role: type }, orgId);
+    } else if (type === "student-edit" || type === "teacher-edit") {
+      const { itemId, ...updates } = body;
+      await apiPatch(`/users/${itemId}`, updates, orgId);
     } else if (type === "course") {
       await apiPost("/courses", body, orgId);
     } else if (type === "class") {
@@ -581,6 +601,8 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
     return {
       student: "The student has been added to your school.",
       teacher: "The teacher has been added to your school.",
+      "student-edit": "The student profile has been updated.",
+      "teacher-edit": "The teacher profile has been updated.",
       course: "The course has been created.",
       class: "The class has been created.",
       "course-edit": "The course has been updated.",
@@ -708,7 +730,7 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
           {activePage === "classes" && <ClassesPage role={role} classes={visibleClasses} archivedClasses={data.archivedClasses} loading={loading} search={search} setSearch={setSearch} onCreate={() => setDialog("class")} onEdit={(item) => openEditDialog("class", item)} onStatusChange={(item, status) => updateStatus("class", item, status)} onEnroll={() => setDialog("enroll")} onOpenClass={openClass} />}
           {activePage === "timetable" && <TimetablePage role={role} classes={data.classes} attendance={data.attendance} loading={loading} onConfigure={configureTimetable} onReview={reviewTimetableRequest} onRecordAttendance={(session) => setAttendanceDialog(session)} />}
           {activePage === "courses" && <CoursesPage courses={data.courses} archivedCourses={data.archivedCourses} loading={loading} role={role} onCreate={() => setDialog("course")} onEdit={(item) => openEditDialog("course", item)} onStatusChange={(item, status) => updateStatus("course", item, status)} />}
-          {activePage === "people" && <PeoplePage role={role} data={data} loading={loading} onCreate={(type) => setDialog(type)} onOpenPerson={openPerson} search={search} setSearch={setSearch} />}
+          {activePage === "people" && <PeoplePage role={role} data={data} loading={loading} onCreate={(type) => setDialog(type)} onEdit={(type, item) => openEditDialog(`${type}-edit`, item)} onStatusChange={updatePersonStatus} onResetPassword={setPasswordResetPerson} onOpenPerson={openPerson} search={search} setSearch={setSearch} />}
           {activePage === "assignments" && <AssignmentPage role={role} assignments={data.assignments} classes={data.classes} loading={loading} organizationId={orgId} onRefresh={refresh} selectedAssignmentId={pendingAssignmentId} onAssignmentOpened={() => setPendingAssignmentId("")} />}
           {activePage === "library" && <LibraryPage role={role} items={data.library} loading={loading} organizationId={orgId} onRefresh={refresh} />}
           {activePage === "quran" && <QuranPage organizationId={orgId} studentName={fullName(person)} />}
@@ -717,7 +739,16 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
       </main>
 
       {dialog && <ActionDialog type={dialog} initialItem={dialogItem} initialClassId={dialogClassId} courses={data.courses.filter((item) => item.status === "active")} teachers={data.teachers} students={data.students} classes={data.classes} onClose={() => { setDialog(""); setDialogItem(null); }} onSubmit={submitCreate} />}
-      {role === "student" && auth.mustChangePassword && <PasswordChangeDialog
+      {passwordResetPerson && <PasswordResetDialog
+        item={passwordResetPerson}
+        organizationId={orgId}
+        onClose={() => setPasswordResetPerson(null)}
+        onComplete={() => {
+          setPasswordResetPerson(null);
+          showNotice(`${fullName(passwordResetPerson.user)} must choose a new password at their next sign-in.`);
+        }}
+      />}
+      {auth.mustChangePassword && <PasswordChangeDialog
         organizationId={orgId}
         onComplete={() => onAuthChange((current) => ({ ...current, mustChangePassword: false }))}
       />}
@@ -1129,9 +1160,12 @@ function CourseRows({ courses, role, onEdit, onStatusChange, showArchived }) {
   ));
 }
 
-function PeoplePage({ role, data, loading, onCreate, onOpenPerson, search, setSearch }) {
+function PeoplePage({ role, data, loading, onCreate, onEdit, onStatusChange, onResetPassword, onOpenPerson, search, setSearch }) {
   const [kind, setKind] = useState("students");
-  const entries = kind === "students" ? data.students : data.teachers;
+  const [showInactive, setShowInactive] = useState(false);
+  const entries = kind === "students"
+    ? showInactive ? data.inactiveStudents : data.students
+    : showInactive ? data.inactiveTeachers : data.teachers;
   const filtered = entries.filter((entry) => {
     const text = `${entry.user?.firstName || ""} ${entry.user?.lastName || ""} ${entry.user?.email || ""}`.toLowerCase();
     return text.includes(search.toLowerCase());
@@ -1139,9 +1173,15 @@ function PeoplePage({ role, data, loading, onCreate, onOpenPerson, search, setSe
   return (
     <>
       <div className="page-heading"><div><p className="eyebrow">YOUR SCHOOL COMMUNITY</p><h2>{role === "teacher" ? "My students" : "People"}</h2><p className="muted">The people who make your school what it is.</p></div>{role === "admin" && <button className="button button-primary" onClick={() => onCreate(kind === "students" ? "student" : "teacher")}><Plus size={17} />Add {kind === "students" ? "student" : "teacher"}</button>}</div>
-      <div className="people-toolbar"><div className="segmented"><button className={kind === "students" ? "active" : ""} onClick={() => setKind("students")}>Students <span>{data.students.length}</span></button>{role === "admin" && <button className={kind === "teachers" ? "active" : ""} onClick={() => setKind("teachers")}>Teachers <span>{data.teachers.length}</span></button>}</div><div className="search-control"><Search size={16} /><input aria-label="Search people" placeholder="Search by name or email" value={search} onChange={(event) => setSearch(event.target.value)} /></div></div>
-      {loading ? <LoadingCards /> : filtered.length === 0 ? <EmptyState icon={Users} title={`No ${kind} to show yet`} text={role === "admin" ? `Add your first ${kind.slice(0, -1)} to grow your school community.` : "Your class community will appear here."} action={role === "admin" ? <button className="button button-primary button-small" onClick={() => onCreate(kind === "students" ? "student" : "teacher")}><Plus size={15} />Add {kind.slice(0, -1)}</button> : null} /> : (
-        <div className="people-list">{filtered.map((entry, index) => <article className="person-row" key={entry._id}><span className={`avatar person-avatar person-tone-${index % 5}`}>{initials(entry.user)}</span><span className="person-info"><strong>{fullName(entry.user)}</strong><small>{entry.user?.email}</small></span><span className="person-detail">{kind === "students" ? entry.profile?.studentNumber || "Student" : entry.profile?.specialization || "Teacher"}</span><span className={`status-pill ${entry.status}`}>{entry.status}</span><button className="icon-button person-action" aria-label={`View ${fullName(entry.user)} details`} onClick={() => onOpenPerson(kind === "students" ? "student" : "teacher", entry)}><ArrowUpRight size={17} /></button></article>)}</div>
+      <div className="people-toolbar">
+        <div className="people-filters">
+          <div className="segmented"><button className={kind === "students" ? "active" : ""} onClick={() => { setKind("students"); setShowInactive(false); }}>Students <span>{data.students.length}</span></button>{role === "admin" && <button className={kind === "teachers" ? "active" : ""} onClick={() => { setKind("teachers"); setShowInactive(false); }}>Teachers <span>{data.teachers.length}</span></button>}</div>
+          {role === "admin" && <div className="segmented people-status-filter"><button className={!showInactive ? "active" : ""} onClick={() => setShowInactive(false)}>Active</button><button className={showInactive ? "active" : ""} onClick={() => setShowInactive(true)}>Inactive <span>{kind === "students" ? data.inactiveStudents.length : data.inactiveTeachers.length}</span></button></div>}
+        </div>
+        <div className="search-control"><Search size={16} /><input aria-label="Search people" placeholder="Search by name or email" value={search} onChange={(event) => setSearch(event.target.value)} /></div>
+      </div>
+      {loading ? <LoadingCards /> : filtered.length === 0 ? <EmptyState icon={Users} title={showInactive ? `No inactive ${kind} to show` : `No ${kind} to show yet`} text={role === "admin" ? showInactive ? "Deactivated members will appear here and can be restored at any time." : `Add your first ${kind.slice(0, -1)} to grow your school community.` : "Your class community will appear here."} action={role === "admin" && !showInactive ? <button className="button button-primary button-small" onClick={() => onCreate(kind === "students" ? "student" : "teacher")}><Plus size={15} />Add {kind.slice(0, -1)}</button> : null} /> : (
+        <div className="people-list">{filtered.map((entry, index) => <article className="person-row" key={entry._id}><span className={`avatar person-avatar person-tone-${index % 5}`}>{initials(entry.user)}</span><span className="person-info"><strong>{fullName(entry.user)}</strong><small>{entry.user?.email}</small></span><span className="person-detail">{kind === "students" ? entry.profile?.studentNumber || "Student" : entry.profile?.specialization || "Teacher"}</span><span className={`status-pill ${entry.status}`}>{entry.status}</span><div className="people-row-actions">{!showInactive && <button type="button" onClick={() => onEdit(kind === "students" ? "student" : "teacher", entry)}>Edit</button>}{role === "admin" && <button type="button" onClick={() => onResetPassword(entry)}>Reset password</button>}<button type="button" onClick={() => onStatusChange(entry, showInactive ? "active" : "inactive")}>{showInactive ? "Reactivate" : "Deactivate"}</button><button className="icon-button person-action" aria-label={`View ${fullName(entry.user)} details`} onClick={() => onOpenPerson(kind === "students" ? "student" : "teacher", entry)}><ArrowUpRight size={17} /></button></div></article>)}</div>
       )}
     </>
   );
@@ -1509,10 +1549,70 @@ function PasswordChangeDialog({ organizationId, onComplete }) {
   );
 }
 
+function PasswordResetDialog({ item, organizationId, onClose, onComplete }) {
+  const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
+
+  async function submit(event) {
+    event.preventDefault();
+    setError("");
+    const formData = new FormData(event.currentTarget);
+    const newPassword = String(formData.get("newPassword") || "");
+    const confirmPassword = String(formData.get("confirmPassword") || "");
+    if (newPassword !== confirmPassword) {
+      setError("The passwords do not match.");
+      return;
+    }
+
+    setPending(true);
+    try {
+      await apiPatch(`/users/${item._id}/password`, { newPassword }, organizationId);
+      onComplete();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !pending) onClose(); }}>
+      <section className="modal action-dialog" role="dialog" aria-modal="true" aria-labelledby="password-reset-title">
+        <div className="modal-heading">
+          <div>
+            <p className="eyebrow">ACCOUNT SUPPORT</p>
+            <h2 id="password-reset-title">Reset password</h2>
+            <p>Set a temporary password for {fullName(item.user)}. Share it securely; they must choose a new one when they next sign in.</p>
+          </div>
+          <button className="icon-button modal-close" type="button" aria-label="Close dialog" disabled={pending} onClick={onClose}><X size={19} /></button>
+        </div>
+        <form className="modal-form" onSubmit={submit}>
+          <FormField label="Temporary password">
+            <input autoFocus required minLength="12" maxLength="128" type="password" name="newPassword" autoComplete="new-password" />
+            <small>Use at least 12 characters. Existing passwords cannot be viewed or recovered.</small>
+          </FormField>
+          <FormField label="Confirm temporary password">
+            <input required minLength="12" maxLength="128" type="password" name="confirmPassword" autoComplete="new-password" />
+          </FormField>
+          {error && <div className="form-error" role="alert">{error}</div>}
+          <div className="modal-actions">
+            <button className="button button-quiet" type="button" disabled={pending} onClick={onClose}>Cancel</button>
+            <button className="button button-primary" type="submit" disabled={pending}>
+              {pending ? <><span className="spinner" />Resetting…</> : <>Set temporary password<ArrowRight size={16} /></>}
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
 function ActionDialog({ type, initialItem = null, initialClassId = "", courses = [], teachers = [], students = [], classes = [], onClose, onSubmit }) {
   const config = {
     student: { title: "Welcome a student", subtitle: "Create their account and student profile.", button: "Add student" },
+    "student-edit": { title: "Edit student", subtitle: "Update their account and student details.", button: "Save student" },
     teacher: { title: "Welcome a teacher", subtitle: "Create their account and teaching profile.", button: "Add teacher" },
+    "teacher-edit": { title: "Edit teacher", subtitle: "Update their account and teaching details.", button: "Save teacher" },
     course: { title: "Create a course", subtitle: "Add a new subject to your school.", button: "Create course" },
     "course-edit": { title: "Edit course", subtitle: "Update the course details for your school.", button: "Save course" },
     class: { title: "Create a class", subtitle: "Choose a course, teacher, and class size.", button: "Create class" },
@@ -1525,6 +1625,8 @@ function ActionDialog({ type, initialItem = null, initialClassId = "", courses =
   const [formError, setFormError] = useState("");
   const [pending, setPending] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const personType = type.startsWith("student") ? "student" : type.startsWith("teacher") ? "teacher" : "";
+  const editingPerson = type.endsWith("-edit") && Boolean(personType);
   const startingClassId = initialClassId || classes[0]?._id || "";
   const [selectedClass, setSelectedClass] = useState(startingClassId);
   const [timetable, setTimetable] = useState(() => {
@@ -1537,7 +1639,7 @@ function ActionDialog({ type, initialItem = null, initialClassId = "", courses =
     }
     return current?.length ? current.map((slot) => ({ ...slot })) : [{ dayOfWeek: 1, startTime: "09:00", endTime: "10:00", googleMeetLink: "" }];
   });
-  const [gender, setGender] = useState("");
+  const [gender, setGender] = useState(() => initialItem?.profile?.gender || "");
 
   useEffect(() => {
     const closeOnEscape = (event) => {
@@ -1554,21 +1656,25 @@ function ActionDialog({ type, initialItem = null, initialClassId = "", courses =
     const formData = new FormData(event.currentTarget);
     const value = (key) => String(formData.get(key) || "").trim();
     const body = { type };
-    if (type === "student" || type === "teacher") {
+    if (personType) {
       Object.assign(body, {
         firstName: value("firstName"),
         lastName: value("lastName"),
         email: value("email"),
       });
-      if (value("password")) body.password = value("password");
-      if (type === "student") {
+      if (editingPerson) body.itemId = initialItem._id;
+      if (!editingPerson && value("password")) body.password = value("password");
+      if (personType === "student") {
         for (const key of ["dateOfBirth", "gender", "genderDescription", "countryOfResidence", "homeCountry", "phoneNumber", "studentNumber", "guardianName", "guardianEmail", "guardianPhone"]) {
           const current = value(key);
-          if (current) body[key] = current;
+          if (editingPerson) body[key] = current || null;
+          else if (current) body[key] = current;
         }
       } else {
-        if (value("employeeId")) body.employeeId = value("employeeId");
-        if (value("specialization")) body.specialization = value("specialization");
+        if (editingPerson || value("employeeId")) body.employeeId = value("employeeId") || null;
+        if (editingPerson || value("specialization")) body.specialization = value("specialization") || null;
+        const qualifications = value("qualifications").split(",").map((item) => item.trim()).filter(Boolean);
+        if (editingPerson || qualifications.length) body.qualifications = qualifications;
       }
     } else if (type === "course" || type === "course-edit") {
       body.name = value("name");
@@ -1625,21 +1731,21 @@ function ActionDialog({ type, initialItem = null, initialClassId = "", courses =
           </div>
         ) : (
         <form className="modal-form" onSubmit={submit}>
-          {(type === "student" || type === "teacher") && <>
-            <div className="form-two"><FormField label="First name"><input autoFocus required name="firstName" autoComplete="given-name" /></FormField><FormField label="Last name"><input required name="lastName" autoComplete="family-name" /></FormField></div>
-            <FormField label="Email address"><input required type="email" name="email" autoComplete="email" /></FormField>
-            <FormField label="Temporary password"><input minLength="12" maxLength="128" type="password" name="password" autoComplete="new-password" /><small>For a new account, enter at least 12 characters. Leave blank to add an account that already exists in another school.</small></FormField>
-            {type === "student" && <>
+          {personType && <>
+            <div className="form-two"><FormField label="First name"><input autoFocus required name="firstName" autoComplete="given-name" defaultValue={initialItem?.user?.firstName || ""} /></FormField><FormField label="Last name"><input required name="lastName" autoComplete="family-name" defaultValue={initialItem?.user?.lastName || ""} /></FormField></div>
+            <FormField label="Email address"><input required type="email" name="email" autoComplete="email" defaultValue={initialItem?.user?.email || ""} /></FormField>
+            {!editingPerson && <FormField label="Temporary password"><input minLength="12" maxLength="128" type="password" name="password" autoComplete="new-password" /><small>For a new account, enter at least 12 characters. Leave blank to add an account that already exists in another school.</small></FormField>}
+            {personType === "student" && <>
               <div className="form-section-title">STUDENT DETAILS <span>OPTIONAL</span></div>
-              <div className="form-two"><FormField label="Date of birth"><input type="date" name="dateOfBirth" max={new Date().toISOString().slice(0, 10)} /></FormField><FormField label="Phone number"><input name="phoneNumber" type="tel" placeholder="+44 20 1234 5678" /></FormField></div>
-              <div className="form-two"><FormField label="Gender"><select name="gender" value={gender} onChange={(event) => setGender(event.target.value)}><option value="">Select gender</option><option value="female">Female</option><option value="male">Male</option><option value="non_binary">Non-binary</option><option value="self_described">Self-described</option><option value="prefer_not_to_say">Prefer not to say</option></select></FormField><FormField label="If self-described"><input name="genderDescription" required={gender === "self_described"} maxLength="80" placeholder="Your description" disabled={gender !== "self_described"} /></FormField></div>
-              <div className="form-two"><FormField label="Country of residence"><input name="countryOfResidence" maxLength="2" placeholder="GB" /></FormField><FormField label="Home country"><input name="homeCountry" maxLength="2" placeholder="NG" /></FormField></div>
-              <FormField label="Student number"><input name="studentNumber" maxLength="40" /></FormField>
+              <div className="form-two"><FormField label="Date of birth"><input type="date" name="dateOfBirth" max={new Date().toISOString().slice(0, 10)} defaultValue={initialItem?.profile?.dateOfBirth ? new Date(initialItem.profile.dateOfBirth).toISOString().slice(0, 10) : ""} /></FormField><FormField label="Phone number"><input name="phoneNumber" type="tel" placeholder="+44 20 1234 5678" defaultValue={initialItem?.profile?.phoneNumber || ""} /></FormField></div>
+              <div className="form-two"><FormField label="Gender"><select name="gender" value={gender} onChange={(event) => setGender(event.target.value)}><option value="">Select gender</option><option value="female">Female</option><option value="male">Male</option><option value="non_binary">Non-binary</option><option value="self_described">Self-described</option><option value="prefer_not_to_say">Prefer not to say</option></select></FormField><FormField label="If self-described"><input name="genderDescription" required={gender === "self_described"} maxLength="80" placeholder="Your description" disabled={gender !== "self_described"} defaultValue={initialItem?.profile?.genderDescription || ""} /></FormField></div>
+              <div className="form-two"><FormField label="Country of residence"><input name="countryOfResidence" maxLength="2" placeholder="GB" defaultValue={initialItem?.profile?.countryOfResidence || ""} /></FormField><FormField label="Home country"><input name="homeCountry" maxLength="2" placeholder="NG" defaultValue={initialItem?.profile?.homeCountry || ""} /></FormField></div>
+              <FormField label="Student number"><input name="studentNumber" maxLength="40" defaultValue={initialItem?.profile?.studentNumber || ""} /></FormField>
               <div className="form-section-title">GUARDIAN CONTACT <span>OPTIONAL</span></div>
-              <FormField label="Guardian name"><input name="guardianName" /></FormField>
-              <div className="form-two"><FormField label="Guardian email"><input type="email" name="guardianEmail" /></FormField><FormField label="Guardian phone"><input type="tel" name="guardianPhone" /></FormField></div>
+              <FormField label="Guardian name"><input name="guardianName" defaultValue={initialItem?.profile?.guardianName || ""} /></FormField>
+              <div className="form-two"><FormField label="Guardian email"><input type="email" name="guardianEmail" defaultValue={initialItem?.profile?.guardianEmail || ""} /></FormField><FormField label="Guardian phone"><input type="tel" name="guardianPhone" defaultValue={initialItem?.profile?.guardianPhone || ""} /></FormField></div>
             </>}
-            {type === "teacher" && <><div className="form-section-title">TEACHER DETAILS <span>OPTIONAL</span></div><div className="form-two"><FormField label="Employee ID"><input name="employeeId" /></FormField><FormField label="Specialization"><input name="specialization" /></FormField></div></>}
+            {personType === "teacher" && <><div className="form-section-title">TEACHER DETAILS <span>OPTIONAL</span></div><div className="form-two"><FormField label="Employee ID"><input name="employeeId" defaultValue={initialItem?.profile?.employeeId || ""} /></FormField><FormField label="Specialization"><input name="specialization" defaultValue={initialItem?.profile?.specialization || ""} /></FormField></div><FormField label="Qualifications"><input name="qualifications" placeholder="Separate qualifications with commas" defaultValue={initialItem?.profile?.qualifications?.join(", ") || ""} /></FormField></>}
           </>}
           {(type === "course" || type === "course-edit") && <><FormField label="Course name"><input autoFocus required name="name" maxLength="120" placeholder="e.g. English language" defaultValue={initialItem?.name || ""} /></FormField><FormField label="Course code"><input required name="code" maxLength="32" placeholder="e.g. ENG-101" defaultValue={initialItem?.code || ""} /></FormField><FormField label="Description"><textarea name="description" rows="3" maxLength="2000" placeholder="What will students explore in this course?" defaultValue={initialItem?.description || ""} /></FormField></>}
           {(type === "class" || type === "class-edit") && <><FormField label="Class name"><input autoFocus required name="name" maxLength="120" placeholder="e.g. Year 8 · Blue group" defaultValue={initialItem?.name || ""} /></FormField><FormField label="Course"><select required name="courseId" defaultValue={initialItem?.course?._id || ""}><option value="" disabled>Choose a course</option>{courses.map((item) => <option key={item._id} value={item._id}>{item.name} · {item.code}</option>)}</select>{courses.length === 0 && <small>Create a course first to use it in a class.</small>}</FormField><FormField label="Assigned teacher"><select required name="teacherMembershipId" defaultValue={initialItem?.teacher?._id || ""}><option value="" disabled>Choose a teacher</option>{teachers.map((item) => <option key={item._id} value={item._id}>{fullName(item.user)}</option>)}</select>{teachers.length === 0 && <small>Add a teacher first to assign one to this class.</small>}</FormField><FormField label="Class capacity"><input type="number" required name="capacity" min="1" max="1000" defaultValue={initialItem?.capacity || 30} /></FormField></>}

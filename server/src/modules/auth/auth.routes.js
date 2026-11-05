@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { rateLimit } from "express-rate-limit";
-import { authenticate, authorize, requireOrganization } from "../../middleware/authenticate.js";
+import { authenticate, requireOrganization } from "../../middleware/authenticate.js";
 import { issueCsrfToken } from "../../middleware/csrf.js";
 import { validate } from "../../middleware/validate.js";
 import { requirePlatformAdmin } from "../../middleware/authenticate.js";
 import { asyncHandler } from "../../utils/async-handler.js";
-import { changeStudentPassword, login, logout, me, platformLogin, platformMe } from "./auth.controller.js";
+import { changePassword, login, logout, me, platformLogin, platformMe } from "./auth.controller.js";
 import { changePasswordSchema, loginSchema, platformAdminLoginSchema } from "./auth.validator.js";
 
 const router = Router();
@@ -37,9 +37,8 @@ router.patch(
   "/password",
   authenticate,
   requireOrganization,
-  authorize("student"),
   validate(changePasswordSchema),
-  asyncHandler(changeStudentPassword),
+  asyncHandler(changePassword),
 );
 router.get("/me", authenticate, requireOrganization, me);
 router.get("/platform/me", authenticate, requirePlatformAdmin, platformMe);

@@ -6,11 +6,14 @@ import {
   createUser,
   getUser,
   listUsers,
+  resetUserPassword,
   updateMembershipStatus,
+  updateUser,
 } from "./user.controller.js";
 import {
   createUserSchema,
   listUsersQuerySchema,
+  resetUserPasswordSchema,
   updateUserStatusSchema,
 } from "./user.validator.js";
 
@@ -24,6 +27,13 @@ router.get("/", authorize("admin"), (req, res, next) => {
 }, asyncHandler(listUsers));
 router.post("/", authorize("admin"), validate(createUserSchema), asyncHandler(createUser));
 router.get("/:membershipId", authorize("admin"), asyncHandler(getUser));
+router.patch("/:membershipId", authorize("admin"), asyncHandler(updateUser));
+router.patch(
+  "/:membershipId/password",
+  authorize("admin"),
+  validate(resetUserPasswordSchema),
+  asyncHandler(resetUserPassword),
+);
 router.patch(
   "/:membershipId/status",
   authorize("admin"),

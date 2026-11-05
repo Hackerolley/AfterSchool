@@ -96,22 +96,22 @@ export function platformMe(req, res) {
   });
 }
 
-export async function changeStudentPassword(req, res) {
+export async function changePassword(req, res) {
   const [user, membership] = await Promise.all([
     User.findById(req.user._id),
     Membership.findOne({
       _id: req.membership._id,
       organization: req.organization._id,
-      role: "student",
       status: "active",
     }),
   ]);
-  if (!user || !membership) throw new HttpError(404, "Student account not found");
+  if (!user || !membership) throw new HttpError(404, "Account not found");
 
   user.passwordHash = await hashPassword(req.body.newPassword);
-  await user.save();
-  membership.mustChangePassword = false;
-  await membership.save();
+  await Promise.all([
+    user.save(),
+    Membership.updateMany({ user: user._id }, { $set: { mustChangePassword: false } }),
+  ]);
   res.json({ success: true, data: { mustChangePassword: false } });
 }
 
