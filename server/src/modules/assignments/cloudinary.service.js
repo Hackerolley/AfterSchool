@@ -4,6 +4,30 @@ import { HttpError } from "../../utils/http-error.js";
 
 let configured = false;
 
+function getCloudinaryErrorMessage(error, config) {
+  const providerError = error?.error ?? error;
+  const message = typeof providerError?.message === "string"
+    ? providerError.message
+    : "Unknown Cloudinary error";
+  return [config.CLOUDINARY_API_KEY, config.CLOUDINARY_API_SECRET]
+    .filter(Boolean)
+    .reduce((result, credential) => result.replaceAll(credential, "[redacted]"), message)
+    .slice(0, 240);
+}
+
+function throwUploadError(error, config, logMessage, userMessage) {
+  const providerMessage = getCloudinaryErrorMessage(error, config);
+  const providerError = error?.error ?? error;
+  const status = Number.isInteger(providerError?.http_code)
+    ? ` (HTTP ${providerError.http_code})`
+    : "";
+  console.error(logMessage, `${providerMessage}${status}`);
+  const diagnostic = config.NODE_ENV === "development"
+    ? ` Cloudinary: ${providerMessage}${status}`
+    : "";
+  throw new HttpError(502, `${userMessage}${diagnostic}`);
+}
+
 export function getCloudinary(config) {
   if (!config.CLOUDINARY_CLOUD_NAME || !config.CLOUDINARY_API_KEY || !config.CLOUDINARY_API_SECRET) {
     throw new HttpError(503, "Document uploads are not configured. Set the Cloudinary server credentials.");
@@ -39,8 +63,12 @@ export async function uploadImage(file, folder, config) {
     const asset = await upload;
     return { publicId: asset.public_id, url: asset.secure_url };
   } catch (error) {
-    console.error("Cloudinary settings image upload failed:", error.message);
-    throw new HttpError(502, "The image could not be stored. Please try again.");
+    throwUploadError(
+      error,
+      config,
+      "Cloudinary settings image upload failed:",
+      "The image could not be stored. Please try again.",
+    );
   }
 }
 
@@ -74,8 +102,12 @@ export async function uploadDocument(file, organizationId, config) {
   try {
     asset = await upload;
   } catch (error) {
-    console.error("Cloudinary assignment upload failed:", error.message);
-    throw new HttpError(502, "The document could not be stored. Please try again.");
+    throwUploadError(
+      error,
+      config,
+      "Cloudinary assignment upload failed:",
+      "The document could not be stored. Please try again.",
+    );
   }
   return {
     publicId: asset.public_id,
