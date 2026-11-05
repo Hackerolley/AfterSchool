@@ -13,7 +13,6 @@ import {
   ChevronRight,
   ChevronDown,
   ClipboardList,
-  CircleHelp,
   GraduationCap,
   LayoutDashboard,
   LogOut,
@@ -282,7 +281,7 @@ function SettingsDialog({ auth, onAuthChange, darkMode, onToggleTheme, organizat
               {auth.user?.avatarUrl && <button className="icon-button" title="Remove profile photo" aria-label="Remove profile photo" disabled={saving !== ""} onClick={() => removeImage("avatar")}><Trash2 size={16} /></button>}
             </div>
           </section>
-          {auth.mode === "school" && <section className="settings-row">
+          {auth.mode === "school" && auth.role !== "student" && <section className="settings-row">
             <div className="settings-identity">{auth.school.logoUrl ? <img className="settings-school-logo" src={auth.school.logoUrl} alt="" /> : <div className="settings-school-logo settings-logo-fallback">{auth.school.name?.[0] || "S"}</div>}<div><strong>School logo</strong><span>{canManageLogo ? "Shown in the school workspace · JPG, PNG, or WebP" : "Managed by your school administrator"}</span></div></div>
             {canManageLogo && <div className="settings-actions">
               <input ref={logoInput} className="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => uploadImage("logo", event.target.files?.[0])} />
@@ -312,7 +311,6 @@ function Brand({ compact = false }) {
       </svg>
       <span className="brand-copy">
         <span className="brand-name">after<span>School</span></span>
-        <span className="brand-tagline">LEARN <i>•</i> GROW <i>•</i> SUCCEED</span>
       </span>
     </div>
   );
@@ -325,13 +323,6 @@ function LoginScreen({ onLogin }) {
   const [organizationSlug, setOrganizationSlug] = useState("");
   const [pending, setPending] = useState(false);
   const [localError, setLocalError] = useState("");
-  const currentWeek = Array.from({ length: 5 }, (_, index) => {
-    const date = new Date();
-    const weekday = date.getDay();
-    const mondayOffset = weekday === 0 ? -6 : 1 - weekday;
-    date.setDate(date.getDate() + mondayOffset + index);
-    return { label: new Intl.DateTimeFormat("en", { weekday: "short" }).format(date).toUpperCase(), today: date.toDateString() === new Date().toDateString() };
-  });
 
   async function submit(event) {
     event.preventDefault();
@@ -348,61 +339,37 @@ function LoginScreen({ onLogin }) {
 
   return (
     <main className="login-page">
-      <section className="login-story">
-        <div className="story-top"><Brand /><span className="story-chip"><span className="live-dot" /> A calmer school day</span></div>
-        <div className="story-content">
-          <p className="eyebrow light-eyebrow"><Sparkles size={14} /> SCHOOL, IN SYNC</p>
-          <h1>More room<br />for <em>what matters.</em></h1>
-          <p className="story-copy">Bring your school community together. Make the everyday feel a little easier.</p>
-          <div className="story-board">
-            <div className="board-heading"><span>YOUR SCHOOL, AT A GLANCE</span><span className="board-period">THIS WEEK <ChevronDown size={12} /></span></div>
-            <div className="board-stats">
-              <div><span className="board-icon mint"><Users size={16} /></span><strong>One community</strong><small>Students, teachers, families</small></div>
-              <div><span className="board-icon peach"><BookOpen size={16} /></span><strong>One clear view</strong><small>Classes and learning together</small></div>
-            </div>
-            <div className="week-strip">{currentWeek.map((day) => <span className={day.today ? "today" : ""} key={day.label}>{day.label}{day.today && <i />}</span>)}</div>
-          </div>
-        </div>
-        <div className="story-foot"><span>Built around your school community</span><span>01 — 03</span></div>
-      </section>
-
       <section className="login-side">
-        <div className="login-mobile-brand"><Brand /></div>
         <div className="login-box">
+          <div className="login-brand"><Brand /></div>
           <div className="login-heading">
-            <span className="login-icon"><ShieldCheck size={21} /></span>
-            <p className="eyebrow">WELCOME BACK</p>
-            <h2>{mode === "platform" ? <>Sign in to your<br />platform console.</> : <>Sign in to your<br />school space.</>}</h2>
-            <p className="muted">{mode === "platform" ? "Manage school workspaces securely." : "Your school day starts right here."}</p>
+            <h2>Sign in</h2>
           </div>
           <div className="login-switch" role="tablist" aria-label="Account type">
-            <button className={mode === "school" ? "selected" : ""} onClick={() => { setMode("school"); setLocalError(""); }} role="tab" aria-selected={mode === "school"} type="button">School account</button>
+            <button className={mode === "school" ? "selected" : ""} onClick={() => { setMode("school"); setLocalError(""); }} role="tab" aria-selected={mode === "school"} type="button">School</button>
             <button className={mode === "platform" ? "selected" : ""} onClick={() => { setMode("platform"); setLocalError(""); }} role="tab" aria-selected={mode === "platform"} type="button">Platform admin</button>
           </div>
           <form className="login-form" onSubmit={submit}>
             {mode === "school" && (
               <label className="field">
                 <span>School slug</span>
-                <div className="input-wrap"><School size={17} /><input required autoComplete="organization" placeholder="your-school-name" value={organizationSlug} onChange={(event) => setOrganizationSlug(event.target.value.toLowerCase())} /></div>
-                <small>Enter the slug provided by your school administrator, e.g. learn-on-the-go.</small>
+                <div className="input-wrap"><School size={17} /><input required autoComplete="organization" placeholder="school-name" value={organizationSlug} onChange={(event) => setOrganizationSlug(event.target.value.toLowerCase())} /></div>
               </label>
             )}
             <label className="field">
-              <span>Email address</span>
+              <span>Email</span>
               <div className="input-wrap"><span className="input-at">@</span><input required type="email" autoComplete="username" placeholder="you@school.com" value={email} onChange={(event) => setEmail(event.target.value)} /></div>
             </label>
             <label className="field">
               <span>Password</span>
-              <input className="plain-input" required type="password" autoComplete="current-password" placeholder="Enter your password" value={password} onChange={(event) => setPassword(event.target.value)} />
+              <input className="plain-input" required type="password" autoComplete="current-password" placeholder="Password" value={password} onChange={(event) => setPassword(event.target.value)} />
             </label>
             {localError && <div className="form-error" role="alert">{localError}</div>}
             <button className="button button-primary login-submit" type="submit" disabled={pending}>
-              {pending ? <><span className="spinner" /> Signing you in…</> : <>Continue to your dashboard <ArrowRight size={17} /></>}
+              {pending ? <><span className="spinner" /> Signing in…</> : "Sign in"}
             </button>
           </form>
-          <div className="login-help"><CircleHelp size={15} /><span>Need access? Ask your school administrator to set up your account.</span></div>
         </div>
-        <footer className="login-footer"><span>© {new Date().getFullYear()} Afterschool</span><span>Made for the moments that matter.</span></footer>
       </section>
     </main>
   );
@@ -718,10 +685,10 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
         </header>
 
         <div className="dashboard-content">
-          <div className={`welcome-row ${activePage === "overview" ? "welcome-row-overview" : ""}`}>
+          {activePage === "overview" && <div className="welcome-row welcome-row-overview">
             <div className="welcome-copy"><p className="eyebrow">{dayLabel.toUpperCase()}</p><h1>{greeting}, {person.firstName}<span className="wave">✳</span></h1><p className="muted welcome-subtitle">{role === "admin" ? "Here's what's happening across your school." : role === "teacher" ? "Your classes and learners, all in one place." : "Your learning journey, all in one place."}</p></div>
-            {activePage === "overview" && <div className="welcome-highlight"><span className="welcome-highlight-icon"><Sparkles size={19} /></span><span><strong>Learn. Grow. Succeed.</strong><small>Everything you need, in one place.</small></span></div>}
-          </div>
+            <div className="welcome-highlight"><span className="welcome-highlight-icon"><Sparkles size={19} /></span><span><strong>Learn. Grow. Succeed.</strong><small>Everything you need, in one place.</small></span></div>
+          </div>}
 
           {error && <div className="error-banner" role="alert"><span>{error}</span><button className="button button-small" onClick={refresh}>Try again</button></div>}
           {notice && <div className="notice-banner" role="status"><Check size={17} />{notice}<button aria-label="Dismiss notification" onClick={() => setNotice("")}><X size={16} /></button></div>}
