@@ -124,6 +124,15 @@ export function libraryEbookUrl(itemId, organizationId) {
   return `${API_URL}/library/${itemId}/file?organizationId=${encodeURIComponent(organizationId)}`;
 }
 
+export function classResourceFileUrl(classId, resourceId, organizationId) {
+  return `${API_URL}/classes/${classId}/resources/${resourceId}/file?organizationId=${encodeURIComponent(organizationId)}`;
+}
+
+export function classProgressReportUrl(classId, studentMembershipId, organizationId, month) {
+  const params = new URLSearchParams({ organizationId, month });
+  return `${API_URL}/classes/${classId}/progress-report/${studentMembershipId}.pdf?${params}`;
+}
+
 export async function apiPatch(path, body, organizationId) {
   return request(path, { method: "PATCH", body, organizationId, csrfToken: await csrfToken() });
 }

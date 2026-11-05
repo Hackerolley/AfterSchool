@@ -25,6 +25,7 @@
     "helmet": "^8.1.0",
     "mongoose": "^8.18.0",
     "multer": "^2.4.0",
+    "pdfkit": "^0.20.2",
     "zod": "^4.1.5"
   },
   "devDependencies": {

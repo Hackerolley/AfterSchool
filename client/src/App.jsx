@@ -44,6 +44,8 @@ import {
   apiPost,
   apiPostForm,
   apiDelete,
+  classProgressReportUrl,
+  classResourceFileUrl,
   getPlatformSession,
   getSchoolSession,
   login,
@@ -720,7 +722,9 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
         onComplete={() => onAuthChange((current) => ({ ...current, mustChangePassword: false }))}
       />}
       {attendanceDialog && <AttendanceDialog session={attendanceDialog} onClose={() => setAttendanceDialog(null)} onSubmit={saveAttendance} />}
-      {details && <DetailsDialog details={details} organizationId={orgId} onClose={() => setDetails(null)} />}
+      {details?.type === "class"
+        ? <ClassLearningDialog details={details} organizationId={orgId} role={role} onClose={() => setDetails(null)} />
+        : details && <DetailsDialog details={details} organizationId={orgId} onClose={() => setDetails(null)} />}
       {settingsOpen && <SettingsDialog auth={auth} onAuthChange={onAuthChange} darkMode={darkMode} onToggleTheme={onToggleTheme} organizationId={orgId} onClose={() => setSettingsOpen(false)} />}
     </div>
   );
@@ -1896,6 +1900,298 @@ function DetailsDialog({ details, organizationId, onClose }) {
         <div className="modal-actions"><button className="button button-quiet" onClick={onClose}>Close</button></div>
       </section>
     </div>
+  );
+}
+
+function getYouTubeEmbedUrl(value) {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    const videoId = host === "youtu.be"
+      ? url.pathname.split("/").filter(Boolean)[0]
+      : ["youtube.com", "youtube-nocookie.com"].includes(host)
+        ? url.pathname === "/watch"
+          ? url.searchParams.get("v")
+          : url.pathname.split("/").filter(Boolean).at(-1)
+        : "";
+    return /^[\w-]{11}$/.test(videoId || "")
+      ? `https://www.youtube-nocookie.com/embed/${videoId}`
+      : "";
+  } catch {
+    return "";
+  }
+}
+
+function ClassLearningDialog({ details, organizationId, role, onClose }) {
+  const schoolClass = details.item;
+  const canEdit = role === "admin" || role === "teacher";
+  const [tab, setTab] = useState("resources");
+  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [learning, setLearning] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [resourceType, setResourceType] = useState("youtube");
+  const [progressStudentId, setProgressStudentId] = useState("");
+  const [progressForm, setProgressForm] = useState(null);
+  const [attendanceDate, setAttendanceDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [attendanceDraft, setAttendanceDraft] = useState({});
+  const [attendanceSaved, setAttendanceSaved] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError("");
+    apiGet(`/classes/${schoolClass._id}/learning?month=${month}`, organizationId)
+      .then((response) => {
+        if (active) setLearning(response.data);
+      })
+      .catch((requestError) => {
+        if (active) setError(requestError.message);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => { active = false; };
+  }, [month, organizationId, schoolClass._id]);
+
+  useEffect(() => {
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape" && !saving) onClose();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [onClose, saving]);
+
+  const students = learning?.students || [];
+  const selectedStudent = students.find((student) => student.membershipId === progressStudentId);
+
+  function editProgress(student) {
+    setProgressStudentId(student.membershipId);
+    setProgressForm({
+      currentTopic: student.progress?.currentTopic || "",
+      nextTopic: student.progress?.nextTopic || "",
+      rating: student.progress?.rating || 3,
+      grade: student.progress?.grade ?? "",
+      teacherNotes: student.progress?.teacherNotes || "",
+      feedback: student.progress?.feedback || "",
+    });
+  }
+
+  async function reloadLearning() {
+    const response = await apiGet(`/classes/${schoolClass._id}/learning?month=${month}`, organizationId);
+    setLearning(response.data);
+  }
+
+  async function addResource(event) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const body = {
+      type: resourceType,
+      title: String(formData.get("title") || "").trim(),
+      description: String(formData.get("description") || "").trim(),
+    };
+    if (resourceType === "youtube") body.youtubeUrl = String(formData.get("youtubeUrl") || "").trim();
+    if (resourceType === "link") body.linkUrl = String(formData.get("linkUrl") || "").trim();
+    if (resourceType === "note") body.content = String(formData.get("content") || "").trim();
+    try {
+      if (["pdf", "video"].includes(resourceType)) {
+        for (const [key, value] of Object.entries(body)) formData.set(key, value);
+        await apiPostForm(`/classes/${schoolClass._id}/resources`, formData, organizationId);
+      } else {
+        await apiPost(`/classes/${schoolClass._id}/resources`, body, organizationId);
+      }
+      form.reset();
+      await reloadLearning();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeResource(resource) {
+    if (!window.confirm(`Remove "${resource.title}" from this class?`)) return;
+    setError("");
+    try {
+      await apiDelete(`/classes/${schoolClass._id}/resources/${resource._id}`, organizationId);
+      await reloadLearning();
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }
+
+  async function saveProgress(event) {
+    event.preventDefault();
+    if (!selectedStudent || !progressForm) return;
+    setSaving(true);
+    setError("");
+    try {
+      await apiPatch(`/classes/${schoolClass._id}/progress`, {
+        studentMembershipId: selectedStudent.membershipId,
+        month,
+        ...progressForm,
+        rating: Number(progressForm.rating),
+        grade: progressForm.grade === "" ? null : Number(progressForm.grade),
+      }, organizationId);
+      setProgressStudentId("");
+      setProgressForm(null);
+      await reloadLearning();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveAttendance(event) {
+    event.preventDefault();
+    setSaving(true);
+    setError("");
+    setAttendanceSaved("");
+    try {
+      await apiPatch(`/classes/${schoolClass._id}/student-attendance`, {
+        sessionDate: attendanceDate,
+        records: students.map((student) => ({
+          studentMembershipId: student.membershipId,
+          status: attendanceDraft[student.membershipId],
+        })),
+      }, organizationId);
+      setAttendanceSaved("Attendance saved.");
+      setAttendanceDraft({});
+      await reloadLearning();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) onClose(); }}>
+      <section className="modal class-learning-modal" role="dialog" aria-modal="true" aria-labelledby="class-learning-title">
+        <header className="class-learning-heading">
+          <div>
+            <p className="eyebrow">{schoolClass.course?.name || "CLASS"}</p>
+            <h2 id="class-learning-title">{schoolClass.name}</h2>
+            <p>{fullName(schoolClass.teacher?.user)}{schoolClass.course?.code ? ` · ${schoolClass.course.code}` : ""}</p>
+          </div>
+          <button className="icon-button modal-close" type="button" aria-label="Close class" onClick={onClose}><X size={19} /></button>
+        </header>
+        <nav className="class-learning-tabs" aria-label="Class learning tools">
+          <button className={tab === "resources" ? "selected" : ""} type="button" onClick={() => setTab("resources")}>Resources</button>
+          <button className={tab === "progress" ? "selected" : ""} type="button" onClick={() => setTab("progress")}>Progress & reports</button>
+        </nav>
+        <div className="class-learning-body">
+          {error && <div className="form-error" role="alert">{error}</div>}
+          {loading ? <div className="details-loading"><span className="spinner details-spinner" />Loading class tools…</div> : tab === "resources" ? (
+            <div className="class-learning-section">
+              {canEdit && <form className="class-resource-form" onSubmit={addResource}>
+                <h3>Add a class resource</h3>
+                <div className="form-two">
+                  <FormField label="Resource type">
+                    <select value={resourceType} onChange={(event) => setResourceType(event.target.value)}>
+                      <option value="youtube">YouTube video</option>
+                      <option value="pdf">PDF document</option>
+                      <option value="video">Video from device</option>
+                      <option value="link">Web link</option>
+                      <option value="note">Class note</option>
+                    </select>
+                  </FormField>
+                  <FormField label="Title"><input required name="title" maxLength="160" placeholder="Resource title" /></FormField>
+                </div>
+                {resourceType === "youtube" && <FormField label="YouTube URL"><input required name="youtubeUrl" type="url" placeholder="https://youtube.com/watch?v=…" /></FormField>}
+                {resourceType === "link" && <FormField label="Web address"><input required name="linkUrl" type="url" placeholder="https://" /></FormField>}
+                {resourceType === "note" && <FormField label="Note"><textarea required name="content" maxLength="5000" rows="3" placeholder="Share instructions or class notes" /></FormField>}
+                {["pdf", "video"].includes(resourceType) && <FormField label={resourceType === "pdf" ? "PDF file (up to 50 MB)" : "Video file (MP4, WebM, or MOV · up to 50 MB)"}>
+                  <input required name="file" type="file" accept={resourceType === "pdf" ? "application/pdf,.pdf" : "video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov"} />
+                </FormField>}
+                <FormField label="Description (optional)"><input name="description" maxLength="2000" placeholder="Short description" /></FormField>
+                <button className="button button-primary button-small" type="submit" disabled={saving}>{saving ? "Adding…" : "Add resource"}</button>
+              </form>}
+              <div className="class-resource-list">
+                {!learning.resources.length ? <p className="details-empty">No class resources yet.</p> : learning.resources.map((resource) => {
+                  const embedUrl = resource.type === "youtube" ? getYouTubeEmbedUrl(resource.youtubeUrl) : "";
+                  return <article className="class-resource-card" key={resource._id}>
+                    {embedUrl && <div className="class-resource-video"><iframe src={embedUrl} title={resource.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerPolicy="strict-origin-when-cross-origin" allowFullScreen /></div>}
+                    {resource.type === "video" && <video className="class-resource-video-player" controls preload="metadata" src={classResourceFileUrl(schoolClass._id, resource._id, organizationId)} />}
+                    <div className="class-resource-copy">
+                      <span className="class-resource-type">{({ youtube: "YouTube", pdf: "PDF", video: "Video", link: "Link", note: "Note" })[resource.type]}</span>
+                      <h4>{resource.title}</h4>
+                      {resource.description && <p>{resource.description}</p>}
+                      {resource.type === "pdf" && <a className="text-button" href={classResourceFileUrl(schoolClass._id, resource._id, organizationId)} target="_blank" rel="noreferrer">{resource.attachment?.originalFilename || "Open PDF"} <ArrowUpRight size={14} /></a>}
+                      {resource.type === "link" && <a className="text-button" href={resource.linkUrl} target="_blank" rel="noopener noreferrer">Open link <ArrowUpRight size={14} /></a>}
+                      {resource.type === "note" && <p className="class-resource-note">{resource.content}</p>}
+                      {canEdit && <button className="text-button class-resource-remove" type="button" onClick={() => removeResource(resource)}><Trash2 size={14} />Remove</button>}
+                    </div>
+                  </article>;
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="class-learning-section">
+              <div className="class-progress-toolbar">
+                <label className="field"><span>Report month</span><input required type="month" value={month} onChange={(event) => { if (event.target.value) setMonth(event.target.value); setProgressStudentId(""); setProgressForm(null); }} /></label>
+                {role === "student" && <a className="button button-primary button-small" href={classProgressReportUrl(schoolClass._id, students[0]?.membershipId || "", organizationId, month)} download>Download PDF report</a>}
+              </div>
+              {role === "student" ? (
+                students.map((student) => <StudentProgressSummary key={student.membershipId} student={student} />)
+              ) : (
+                <>
+                  {canEdit && students.length > 0 && <form className="attendance-register" onSubmit={saveAttendance}>
+                    <div className="attendance-register-heading"><h3>Class attendance</h3><input aria-label="Attendance date" required type="date" value={attendanceDate} onChange={(event) => setAttendanceDate(event.target.value)} /></div>
+                    {students.map((student) => <label className="attendance-register-row" key={student.membershipId}><span>{fullName(student.user)}</span><select required value={attendanceDraft[student.membershipId] || ""} onChange={(event) => setAttendanceDraft((current) => ({ ...current, [student.membershipId]: event.target.value }))}><option value="">Select</option><option value="present">Present</option><option value="late">Late</option><option value="absent">Absent</option><option value="excused">Excused</option></select></label>)}
+                    {attendanceSaved && <p className="class-learning-success" role="status">{attendanceSaved}</p>}
+                    <button className="button button-quiet button-small" type="submit" disabled={saving || !students.length}>{saving ? "Saving…" : "Save attendance"}</button>
+                  </form>}
+                  {progressForm && selectedStudent && <form className="class-progress-form" onSubmit={saveProgress}>
+                    <h3>Progress for {fullName(selectedStudent.user)}</h3>
+                    <div className="form-two">
+                      <FormField label="Current topic"><input maxLength="240" value={progressForm.currentTopic} onChange={(event) => setProgressForm({ ...progressForm, currentTopic: event.target.value })} /></FormField>
+                      <FormField label="Next topic"><input maxLength="240" value={progressForm.nextTopic} onChange={(event) => setProgressForm({ ...progressForm, nextTopic: event.target.value })} /></FormField>
+                      <FormField label="Progress rating"><select value={progressForm.rating} onChange={(event) => setProgressForm({ ...progressForm, rating: event.target.value })}><option value="1">1 — Needs support</option><option value="2">2 — Developing</option><option value="3">3 — On track</option><option value="4">4 — Strong</option><option value="5">5 — Excellent</option></select></FormField>
+                      <FormField label="Monthly grade (%)"><input type="number" min="0" max="100" step="1" value={progressForm.grade} onChange={(event) => setProgressForm({ ...progressForm, grade: event.target.value })} /></FormField>
+                    </div>
+                    <FormField label="Feedback for student"><textarea rows="3" maxLength="4000" value={progressForm.feedback} onChange={(event) => setProgressForm({ ...progressForm, feedback: event.target.value })} /></FormField>
+                    <FormField label="Private teacher notes"><textarea rows="3" maxLength="4000" value={progressForm.teacherNotes} onChange={(event) => setProgressForm({ ...progressForm, teacherNotes: event.target.value })} /></FormField>
+                    <div className="modal-actions"><button className="button button-quiet button-small" type="button" onClick={() => { setProgressStudentId(""); setProgressForm(null); }}>Cancel</button><button className="button button-primary button-small" type="submit" disabled={saving}>{saving ? "Saving…" : "Save progress"}</button></div>
+                  </form>}
+                  <div className="class-student-progress-list">
+                    {students.map((student) => <article className="class-student-progress" key={student.membershipId}>
+                      <div><strong>{fullName(student.user)}</strong><small>{student.progress?.currentTopic || "No progress update"}{student.progress?.grade !== undefined ? ` · Grade ${student.progress.grade}%` : ""}</small><small>Attendance {student.attendance.present + student.attendance.late}/{student.attendance.present + student.attendance.late + student.attendance.absent || 0} · Assignments {student.assignments.submitted}/{student.assignments.total}</small></div>
+                      <div className="class-student-progress-actions"><button className="button button-quiet button-small" type="button" onClick={() => editProgress(student)}>Update progress</button><a className="button button-quiet button-small" href={classProgressReportUrl(schoolClass._id, student.membershipId, organizationId, month)} download>PDF report</a></div>
+                    </article>)}
+                    {!students.length && <p className="details-empty">No active students are enrolled in this class.</p>}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+        <footer className="modal-actions"><button className="button button-quiet" type="button" disabled={saving} onClick={onClose}>Close</button></footer>
+      </section>
+    </div>
+  );
+}
+
+function StudentProgressSummary({ student }) {
+  const progress = student.progress;
+  return (
+    <section className="student-progress-summary">
+      <h3>{progress?.month || "Monthly"} progress</h3>
+      <div className="details-summary">
+        <DetailItem label="Current topic" value={progress?.currentTopic || "Not updated"} />
+        <DetailItem label="Next topic" value={progress?.nextTopic || "Not set"} />
+        <DetailItem label="Progress rating" value={progress?.rating ? `${progress.rating}/5` : "Not rated"} />
+        <DetailItem label="Monthly grade" value={progress?.grade !== undefined && progress?.grade !== null ? `${progress.grade}%` : "Not graded"} />
+        <DetailItem label="Attendance" value={`${student.attendance.present + student.attendance.late} of ${student.attendance.present + student.attendance.late + student.attendance.absent} sessions`} />
+        <DetailItem label="Assignments" value={`${student.assignments.submitted} submitted · ${student.assignments.averageScore === null ? "No score" : `${student.assignments.averageScore}% average`}`} />
+      </div>
+      <div className="student-progress-feedback"><strong>Teacher feedback</strong><p>{progress?.feedback || "No feedback this month."}</p></div>
+    </section>
   );
 }
 

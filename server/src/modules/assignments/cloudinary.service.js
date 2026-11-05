@@ -117,6 +117,41 @@ export async function uploadDocument(file, organizationId, config) {
   };
 }
 
+export async function uploadVideo(file, organizationId, config) {
+  const client = getCloudinary(config);
+  const upload = new Promise((resolve, reject) => {
+    const stream = client.uploader.upload_stream(
+      {
+        resource_type: "video",
+        type: "authenticated",
+        folder: `afterschool/${organizationId}/class-videos`,
+        use_filename: false,
+        unique_filename: true,
+      },
+      (error, result) => (error ? reject(error) : resolve(result)),
+    );
+    Readable.from(file.buffer).pipe(stream);
+  });
+
+  let asset;
+  try {
+    asset = await upload;
+  } catch (error) {
+    throwUploadError(
+      error,
+      config,
+      "Cloudinary class video upload failed:",
+      "The video could not be stored. Please try again.",
+    );
+  }
+  return {
+    publicId: asset.public_id,
+    originalFilename: file.originalname.replace(/[^\w.\- ()]/g, "_").slice(0, 180),
+    format: asset.format || "mp4",
+    bytes: asset.bytes,
+  };
+}
+
 export async function deleteDocument(attachment, config) {
   if (!attachment?.publicId) return;
   const client = getCloudinary(config);
@@ -131,12 +166,36 @@ export async function deleteDocument(attachment, config) {
   }
 }
 
+export async function deleteVideo(attachment, config) {
+  if (!attachment?.publicId) return;
+  const client = getCloudinary(config);
+  try {
+    await client.uploader.destroy(attachment.publicId, {
+      resource_type: "video",
+      type: "authenticated",
+      invalidate: true,
+    });
+  } catch (error) {
+    console.error("Cloudinary class video cleanup failed:", error.message);
+  }
+}
+
 export function privateDocumentUrl(attachment, config) {
   const client = getCloudinary(config);
   return client.utils.private_download_url(attachment.publicId, attachment.format, {
     resource_type: "raw",
     type: "authenticated",
     attachment: attachment.originalFilename,
+    expires_at: Math.floor(Date.now() / 1000) + 300,
+  });
+}
+
+export function privateVideoUrl(attachment, config) {
+  const client = getCloudinary(config);
+  return client.utils.private_download_url(attachment.publicId, attachment.format, {
+    resource_type: "video",
+    type: "authenticated",
+    attachment: false,
     expires_at: Math.floor(Date.now() / 1000) + 300,
   });
 }

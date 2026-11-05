@@ -20,6 +20,12 @@ import {
   updateTeacherSchema,
 } from "../src/modules/users/user.validator.js";
 import {
+  createClassResourceSchema,
+  listClassLearningQuerySchema,
+  updateStudentAttendanceSchema,
+  updateStudentProgressSchema,
+} from "../src/modules/classes/class-learning.validator.js";
+import {
   listAttendanceQuerySchema,
   recordAttendanceSchema,
   updateClassSchema,
@@ -32,7 +38,8 @@ import {
   reviewAssignmentSubmissionSchema,
   submitAssignmentSchema,
 } from "../src/modules/assignments/assignment.validator.js";
-import { privateDocumentUrl } from "../src/modules/assignments/cloudinary.service.js";
+import { privateDocumentUrl, privateVideoUrl } from "../src/modules/assignments/cloudinary.service.js";
+import { createProgressReportPdf } from "../src/modules/classes/progress-report.pdf.js";
 import { createLibraryItemSchema } from "../src/modules/library/library.validator.js";
 import { updateProgressSchema } from "../src/modules/quran/quran.validator.js";
 import { clearQuranTokenCache, fetchQuranContent } from "../src/modules/quran/quran.service.js";
@@ -85,6 +92,24 @@ test("private assignment document URLs use authenticated, expiring Cloudinary do
   const expiresAt = Number(url.searchParams.get("expires_at"));
   assert.ok(expiresAt >= before + 300 && expiresAt <= before + 301);
   assert.equal(url.searchParams.get("attachment"), "reading.pdf");
+});
+
+test("private class video URLs use authenticated, expiring inline Cloudinary downloads", () => {
+  const before = Math.floor(Date.now() / 1000);
+  const url = new URL(privateVideoUrl({
+    publicId: "afterschool/example/class-videos/lesson",
+    format: "mp4",
+  }, {
+    CLOUDINARY_CLOUD_NAME: "test-cloud",
+    CLOUDINARY_API_KEY: "test-api-key",
+    CLOUDINARY_API_SECRET: "test-api-secret",
+  }));
+  assert.equal(url.hostname, "api.cloudinary.com");
+  assert.match(url.pathname, /\/download$/);
+  assert.equal(url.searchParams.get("type"), "authenticated");
+  assert.equal(url.searchParams.get("attachment"), "false");
+  const expiresAt = Number(url.searchParams.get("expires_at"));
+  assert.ok(expiresAt >= before + 300 && expiresAt <= before + 301);
 });
 
 test("health check is unavailable when MongoDB is disconnected", async () => {
@@ -437,6 +462,92 @@ test("class attendance reports require an authenticated school member", async ()
   await request(makeApp()).get("/api/v1/classes/attendance").expect(401);
 });
 
+test("class learning resources accept safe YouTube, file, link, and note types", () => {
+  const youtube = createClassResourceSchema.safeParse({
+    type: "youtube",
+    title: "Fractions",
+    youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+  });
+  assert.equal(youtube.success, true);
+  assert.equal(youtube.data.youtubeUrl, "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  assert.equal(createClassResourceSchema.safeParse({ type: "pdf", title: "Worksheet" }).success, true);
+  assert.equal(createClassResourceSchema.safeParse({ type: "video", title: "Lesson recording" }).success, true);
+  assert.equal(createClassResourceSchema.safeParse({
+    type: "link",
+    title: "Reading",
+    linkUrl: "javascript:alert(1)",
+  }).success, false);
+  assert.equal(createClassResourceSchema.safeParse({
+    type: "note",
+    title: "Homework",
+    content: "Complete pages 4-5",
+  }).success, true);
+  assert.equal(createClassResourceSchema.safeParse({
+    type: "youtube",
+    title: "Unsafe video",
+    youtubeUrl: "https://example.com/watch?v=dQw4w9WgXcQ",
+  }).success, false);
+});
+
+test("class progress and attendance validate monthly grades and unique student entries", () => {
+  const id = "507f1f77bcf86cd799439011";
+  const progress = updateStudentProgressSchema.safeParse({
+    studentMembershipId: id,
+    month: "2026-03",
+    currentTopic: "Fractions",
+    nextTopic: "Decimals",
+    rating: "4",
+    grade: 88,
+    teacherNotes: "Review equivalent fractions",
+    feedback: "Good progress",
+  });
+  assert.equal(progress.success, true);
+  assert.equal(progress.data.grade, 88);
+  assert.equal(updateStudentProgressSchema.safeParse({
+    studentMembershipId: id,
+    month: "2026-13",
+    rating: 6,
+  }).success, false);
+  assert.equal(listClassLearningQuerySchema.safeParse({ month: "2026-03" }).success, true);
+  assert.equal(listClassLearningQuerySchema.safeParse({
+    month: "2026-03",
+    organizationId: id,
+  }).success, true);
+  assert.equal(listClassLearningQuerySchema.safeParse({ month: "2026-3" }).success, false);
+  assert.equal(updateStudentAttendanceSchema.safeParse({
+    sessionDate: "2026-03-15",
+    records: [{ studentMembershipId: id, status: "present" }],
+  }).success, true);
+  assert.equal(updateStudentAttendanceSchema.safeParse({
+    sessionDate: "2026-03-15",
+    records: [
+      { studentMembershipId: id, status: "present" },
+      { studentMembershipId: id, status: "absent" },
+    ],
+  }).success, false);
+});
+
+test("progress report PDF generation returns a downloadable PDF document", async () => {
+  const pdf = await createProgressReportPdf({
+    studentName: "Ada Student",
+    className: "Year 5 Maths",
+    courseName: "Mathematics",
+    monthLabel: "March 2026",
+    generatedAt: "March 31, 2026",
+    attendance: { present: 8, late: 1, absent: 1, excused: 0 },
+    assignments: { total: 4, submitted: 3, reviewed: 2, averageScore: 86 },
+    progress: {
+      rating: 4,
+      grade: 88,
+      currentTopic: "Fractions",
+      nextTopic: "Decimals",
+      feedback: "Good progress",
+    },
+  });
+  assert.equal(pdf.subarray(0, 5).toString(), "%PDF-");
+  assert.ok(pdf.length > 500);
+});
+
 test("unsafe requests require a session CSRF token", async () => {
   const response = await request(makeApp())
     .post("/api/v1/auth/login")
@@ -462,6 +573,14 @@ test("student password change requires an authenticated school membership and CS
     .set("X-CSRF-Token", csrfResponse.body.data.csrfToken)
     .send({ newPassword: "a-secure-new-password" })
     .expect(401);
+});
+
+test("class learning endpoints require an authenticated school session", async () => {
+  const response = await request(makeApp())
+    .get("/api/v1/classes/507f1f77bcf86cd799439011/learning?month=2026-03")
+    .set("X-Organization-Id", "507f1f77bcf86cd799439012")
+    .expect(401);
+  assert.equal(response.body.message, "Authentication required");
 });
 
 test("admin password reset requires an authenticated school administrator and CSRF", async () => {

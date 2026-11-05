@@ -320,7 +320,7 @@ export async function listClasses(req, res) {
   });
 }
 
-async function getVisibleClass(req) {
+export async function getVisibleClass(req) {
   const schoolClass = await SchoolClass.findOne({
     _id: req.params.classId,
     organization: req.organization._id,

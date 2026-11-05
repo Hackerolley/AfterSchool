@@ -28,9 +28,36 @@ import {
   updateClassSchema,
   updateClassTimetableSchema,
 } from "./class.validator.js";
+import {
+  createClassResource,
+  deleteClassResource,
+  downloadProgressReport,
+  getClassLearning,
+  getClassResourceFile,
+  listClassResources,
+  updateStudentAttendance,
+  updateStudentProgress,
+} from "./class-learning.controller.js";
+import {
+  createClassResourceSchema,
+  listClassLearningQuerySchema,
+  updateStudentAttendanceSchema,
+  updateStudentProgressSchema,
+} from "./class-learning.validator.js";
+import { uploadClassResourceFile } from "./class-resource.upload.js";
 
 const router = Router();
-router.use(authenticate, requireOrganization);
+router.use(authenticate);
+router.use((req, res, next) => {
+  if (
+    req.method === "GET"
+    && (req.path.endsWith("/file") || req.path.endsWith(".pdf"))
+    && typeof req.query.organizationId === "string"
+  ) {
+    req.headers["x-organization-id"] = req.query.organizationId;
+  }
+  next();
+}, requireOrganization);
 router.get("/", validate(listClassesQuerySchema, "query"), asyncHandler(listClasses));
 router.get(
   "/attendance",
@@ -89,6 +116,42 @@ router.delete(
   "/:classId/enrollments/:enrollmentId",
   authorize("admin"),
   asyncHandler(withdrawStudent),
+);
+router.get(
+  "/:classId/learning",
+  validate(listClassLearningQuerySchema, "query"),
+  asyncHandler(getClassLearning),
+);
+router.get("/:classId/resources", asyncHandler(listClassResources));
+router.post(
+  "/:classId/resources",
+  authorize("admin", "teacher"),
+  uploadClassResourceFile,
+  validate(createClassResourceSchema),
+  asyncHandler(createClassResource),
+);
+router.get("/:classId/resources/:resourceId/file", asyncHandler(getClassResourceFile));
+router.delete(
+  "/:classId/resources/:resourceId",
+  authorize("admin", "teacher"),
+  asyncHandler(deleteClassResource),
+);
+router.patch(
+  "/:classId/progress",
+  authorize("admin", "teacher"),
+  validate(updateStudentProgressSchema),
+  asyncHandler(updateStudentProgress),
+);
+router.patch(
+  "/:classId/student-attendance",
+  authorize("admin", "teacher"),
+  validate(updateStudentAttendanceSchema),
+  asyncHandler(updateStudentAttendance),
+);
+router.get(
+  "/:classId/progress-report/:studentId.pdf",
+  validate(listClassLearningQuerySchema, "query"),
+  asyncHandler(downloadProgressReport),
 );
 router.get("/:classId", asyncHandler(getClass));
 

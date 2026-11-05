@@ -66,6 +66,7 @@ const submissionSchema = new mongoose.Schema(
 
 submissionSchema.index({ assignment: 1, student: 1 }, { unique: true });
 submissionSchema.index({ organization: 1, assignment: 1, submittedAt: -1 });
+submissionSchema.index({ organization: 1, student: 1, assignment: 1 });
 
 export const Assignment = mongoose.model("Assignment", assignmentSchema);
 export const AssignmentSubmission = mongoose.model("AssignmentSubmission", submissionSchema);
