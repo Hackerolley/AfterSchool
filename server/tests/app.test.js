@@ -4,7 +4,8 @@ import session from "express-session";
 import request from "supertest";
 import { createApp } from "../src/app.js";
 import { requirePlatformAdmin } from "../src/middleware/authenticate.js";
-import { loginSchema, platformAdminLoginSchema } from "../src/modules/auth/auth.validator.js";
+import { changePasswordSchema, loginSchema, platformAdminLoginSchema } from "../src/modules/auth/auth.validator.js";
+import { Membership } from "../src/modules/memberships/membership.model.js";
 import {
   createOrganizationSchema,
   listOrganizationMembershipsQuerySchema,
@@ -16,8 +17,10 @@ import { createUserSchema } from "../src/modules/users/user.validator.js";
 import {
   listAttendanceQuerySchema,
   recordAttendanceSchema,
+  updateClassSchema,
   updateClassTimetableSchema,
 } from "../src/modules/classes/class.validator.js";
+import { updateCourseSchema } from "../src/modules/courses/course.validator.js";
 import {
   canonicalYouTubeUrl,
   createAssignmentSchema,
@@ -348,6 +351,41 @@ test("class timetable updates require an authenticated school member", async () 
     .expect(401);
 });
 
+test("class and course update schemas accept only valid editable fields", () => {
+  const classId = "507f1f77bcf86cd799439011";
+  assert.deepEqual(updateClassSchema.parse({ name: "  Year 8 Blue  ", capacity: 24 }), {
+    name: "Year 8 Blue",
+    capacity: 24,
+  });
+  assert.equal(updateClassSchema.safeParse({ status: "archived" }).success, true);
+  assert.equal(updateClassSchema.safeParse({}).success, false);
+  assert.equal(updateClassSchema.safeParse({ name: "" }).success, false);
+  assert.equal(updateClassSchema.safeParse({ courseId: "invalid" }).success, false);
+  assert.equal(updateClassSchema.safeParse({ name: "Valid", extra: true }).success, false);
+  assert.equal(updateCourseSchema.safeParse({ name: "Maths", code: "math-8" }).success, true);
+  assert.equal(updateCourseSchema.parse({ code: "math-8" }).code, "MATH-8");
+  assert.equal(updateCourseSchema.safeParse({ status: "archived" }).success, true);
+  assert.equal(updateCourseSchema.safeParse({}).success, false);
+  assert.equal(updateCourseSchema.safeParse({ status: "deleted" }).success, false);
+  assert.equal(updateCourseSchema.safeParse({ id: classId }).success, false);
+});
+
+test("class and course management writes require authentication and CSRF", async () => {
+  const agent = request.agent(makeApp());
+  const csrfResponse = await agent.get("/api/v1/auth/csrf").expect(200);
+  for (const [method, path, body] of [
+    ["patch", "/api/v1/classes/507f1f77bcf86cd799439011", { name: "Year 8" }],
+    ["delete", "/api/v1/classes/507f1f77bcf86cd799439011", {}],
+    ["patch", "/api/v1/courses/507f1f77bcf86cd799439011", { name: "Maths" }],
+    ["delete", "/api/v1/courses/507f1f77bcf86cd799439011", {}],
+  ]) {
+    await agent[method](path)
+      .set("X-CSRF-Token", csrfResponse.body.data.csrfToken)
+      .send(body)
+      .expect(401);
+  }
+});
+
 test("class attendance validates session outcomes, reschedules, and date/time values", () => {
   const session = {
     sessionDate: "2026-10-19",
@@ -400,6 +438,25 @@ test("unsafe requests require a session CSRF token", async () => {
     .send({ email: "invalid", password: "x", organizationId: "invalid" })
     .expect(403);
   assert.equal(response.body.message, "Valid CSRF token required");
+});
+
+test("student accounts require a new password by default and password changes validate securely", () => {
+  assert.equal(new Membership({ role: "student" }).mustChangePassword, true);
+  assert.equal(new Membership({ role: "teacher" }).mustChangePassword, false);
+  assert.equal(new Membership({ role: "admin" }).mustChangePassword, false);
+  assert.equal(changePasswordSchema.safeParse({ newPassword: "a-secure-new-password" }).success, true);
+  assert.equal(changePasswordSchema.safeParse({ newPassword: "short" }).success, false);
+  assert.equal(changePasswordSchema.safeParse({ newPassword: "a-secure-new-password", extra: true }).success, false);
+});
+
+test("student password change requires an authenticated school membership and CSRF", async () => {
+  const agent = request.agent(makeApp());
+  const csrfResponse = await agent.get("/api/v1/auth/csrf").expect(200);
+  await agent
+    .patch("/api/v1/auth/password")
+    .set("X-CSRF-Token", csrfResponse.body.data.csrfToken)
+    .send({ newPassword: "a-secure-new-password" })
+    .expect(401);
 });
 
 test("CSRF token is session-bound and request validation runs afterward", async () => {

@@ -127,6 +127,71 @@ export async function createClass(req, res) {
   res.status(201).json({ success: true, data: schoolClass });
 }
 
+export async function updateClass(req, res) {
+  if (req.body.status === "active") {
+    const currentClass = await SchoolClass.findOne({
+      _id: req.params.classId,
+      organization: req.organization._id,
+    }).select("course teacher");
+    if (!currentClass) throw new HttpError(404, "Class not found");
+    const [course, teacher] = await Promise.all([
+      Course.exists({ _id: currentClass.course, organization: req.organization._id, status: "active" }),
+      Membership.exists({
+        _id: currentClass.teacher,
+        organization: req.organization._id,
+        role: "teacher",
+        status: "active",
+      }),
+    ]);
+    if (!course || !teacher) {
+      throw new HttpError(409, "Restore the assigned course and teacher before restoring this class");
+    }
+  }
+
+  const updates = {};
+  if (req.body.name !== undefined) updates.name = req.body.name;
+  if (req.body.capacity !== undefined) updates.capacity = req.body.capacity;
+  if (req.body.status !== undefined) updates.status = req.body.status;
+
+  if (req.body.courseId !== undefined) {
+    const course = await Course.findOne({
+      _id: req.body.courseId,
+      organization: req.organization._id,
+      status: "active",
+    }).select("_id");
+    if (!course) throw new HttpError(400, "An active course in this organization is required");
+    updates.course = course._id;
+  }
+  if (req.body.teacherMembershipId !== undefined) {
+    const teacher = await Membership.findOne({
+      _id: req.body.teacherMembershipId,
+      organization: req.organization._id,
+      role: "teacher",
+      status: "active",
+    }).select("_id");
+    if (!teacher) throw new HttpError(400, "An active teacher in this organization is required");
+    updates.teacher = teacher._id;
+  }
+
+  const schoolClass = await SchoolClass.findOneAndUpdate(
+    { _id: req.params.classId, organization: req.organization._id },
+    updates,
+    { new: true, runValidators: true },
+  );
+  if (!schoolClass) throw new HttpError(404, "Class not found");
+  res.json({ success: true, data: schoolClass });
+}
+
+export async function archiveClass(req, res) {
+  const schoolClass = await SchoolClass.findOneAndUpdate(
+    { _id: req.params.classId, organization: req.organization._id, status: "active" },
+    { status: "archived" },
+    { new: true, runValidators: true },
+  );
+  if (!schoolClass) throw new HttpError(404, "Active class not found");
+  res.json({ success: true, data: schoolClass });
+}
+
 export async function updateClassTimetable(req, res) {
   const schoolClass = await SchoolClass.findOneAndUpdate(
     {
@@ -207,7 +272,7 @@ function visibleClassesFilter(membership, organizationId) {
 export async function listClasses(req, res) {
   const { page, limit, search, status } = req.validatedQuery;
   const filter = visibleClassesFilter(req.membership, req.organization._id);
-  if (status) filter.status = status;
+  filter.status = req.membership.role === "admin" ? status || "active" : "active";
   if (search) {
     const safeSearch = search.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     filter.name = { $regex: safeSearch, $options: "i" };
@@ -274,6 +339,9 @@ async function getVisibleClass(req) {
     .lean();
 
   if (!schoolClass) throw new HttpError(404, "Class not found");
+  if (schoolClass.status !== "active" && req.membership.role !== "admin") {
+    throw new HttpError(404, "Class not found");
+  }
   if (req.membership.role === "teacher" && schoolClass.teacher._id.toString() !== req.membership._id.toString()) {
     throw new HttpError(403, "You do not have permission");
   }

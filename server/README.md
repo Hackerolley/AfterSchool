@@ -116,6 +116,7 @@ Paginated list routes accept `page` (default `1`) and `limit` (default `20`, max
 | GET | `/health` | Check API health and whether MongoDB is connected. Returns `503` when the database is disconnected. | Public |
 | GET | `/auth/csrf` | Create or retrieve the session's CSRF token before login or another state-changing request. | Public |
 | POST | `/auth/login` | Sign in to a school using email, password, and exactly one of `organizationId` or `organizationSlug`; returns the active school membership and CSRF token. | Public; rate-limited |
+| PATCH | `/auth/password` | Change the signed-in student's password and clear the required first-login password change flag. Requires `newPassword` (12-128 characters). | Active school student |
 | POST | `/auth/platform/login` | Sign in a platform administrator without selecting a school; returns a platform session and CSRF token. | Public; rate-limited |
 | GET | `/auth/me` | Get the signed-in user's profile and role in the selected school. | Active member of selected school |
 | GET | `/auth/platform/me` | Get the signed-in platform administrator's profile. | Platform admin |
@@ -167,9 +168,13 @@ Night-mode preference is stored locally in the browser and applies across school
 |---|---|---|---|
 | GET | `/courses` | List courses in the school; supports pagination, search, and status filters. Teachers see courses for their assigned classes; students see courses for their active enrollments. | Active school member |
 | POST | `/courses` | Create a course with a name, code, and optional description. Course codes must be unique within the school. | School admin |
+| PATCH | `/courses/:courseId` | Update a course's name, code, description, or status. Restore archived courses with `status: "active"`. | School admin |
+| DELETE | `/courses/:courseId` | Archive a course while retaining records. Courses with active classes must have those classes archived first. | School admin |
 | GET | `/courses/:courseId` | Get a course. Teachers must be assigned to one of its classes; students must be enrolled in one of its classes. | School admin, assigned teacher, or enrolled student |
 | GET | `/classes` | List classes with course and teacher information; supports pagination, search, and status filters. Teachers see their assigned classes; students see their active enrollments. | Active school member |
 | POST | `/classes` | Create a class for an active course and assign an active teacher from this same school; accepts an optional capacity and weekly timetable. | School admin |
+| PATCH | `/classes/:classId` | Update a class's name, course, assigned teacher, capacity, or status. Restore archived classes with `status: "active"` after restoring their course and teacher. | School admin |
+| DELETE | `/classes/:classId` | Archive a class while retaining enrollments, attendance, and assignment history. | School admin |
 | PATCH | `/classes/:classId/timetable` | Replace a class's weekly timetable. Each session has `dayOfWeek` (`0` Sunday through `6` Saturday), 24-hour `startTime` and `endTime`, and an HTTPS `googleMeetLink` on `meet.google.com`. | School admin |
 | POST | `/classes/:classId/timetable-requests` | Submit a proposed replacement timetable. The approved schedule remains active until an admin reviews it. | Teacher assigned to class |
 | POST | `/classes/:classId/timetable-requests/approve` | Publish the class's pending teacher timetable proposal. | School admin |

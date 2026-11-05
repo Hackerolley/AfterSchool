@@ -6,6 +6,15 @@ export const createCourseSchema = z.object({
   description: z.string().trim().max(2000).optional(),
 }).strict();
 
+export const updateCourseSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  code: z.string().trim().min(1).max(32).transform((value) => value.toUpperCase()),
+  description: z.string().trim().max(2000),
+  status: z.enum(["active", "archived"]),
+}).partial().strict().refine((value) => Object.keys(value).length > 0, {
+  message: "At least one course field is required",
+});
+
 export const listCoursesQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),

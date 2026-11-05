@@ -4,6 +4,7 @@ import { validate } from "../../middleware/validate.js";
 import { asyncHandler } from "../../utils/async-handler.js";
 import {
   createClass,
+  archiveClass,
   approveClassTimetableChange,
   enrollStudent,
   getClass,
@@ -13,6 +14,7 @@ import {
   recordClassAttendance,
   rejectClassTimetableChange,
   requestClassTimetableChange,
+  updateClass,
   updateClassTimetable,
   withdrawStudent,
 } from "./class.controller.js";
@@ -23,6 +25,7 @@ import {
   listAttendanceQuerySchema,
   listClassesQuerySchema,
   recordAttendanceSchema,
+  updateClassSchema,
   updateClassTimetableSchema,
 } from "./class.validator.js";
 
@@ -48,6 +51,13 @@ router.patch(
   validate(updateClassTimetableSchema),
   asyncHandler(updateClassTimetable),
 );
+router.patch(
+  "/:classId",
+  authorize("admin"),
+  validate(updateClassSchema),
+  asyncHandler(updateClass),
+);
+router.delete("/:classId", authorize("admin"), asyncHandler(archiveClass));
 router.post(
   "/:classId/timetable-requests",
   authorize("teacher"),

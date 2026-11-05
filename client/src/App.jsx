@@ -414,10 +414,11 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [data, setData] = useState({ classes: [], courses: [], students: [], teachers: [], assignments: [], attendance: [], library: [] });
+  const [data, setData] = useState({ classes: [], archivedClasses: [], courses: [], archivedCourses: [], students: [], teachers: [], assignments: [], attendance: [], library: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [dialog, setDialog] = useState("");
+  const [dialogItem, setDialogItem] = useState(null);
   const [dialogClassId, setDialogClassId] = useState("");
   const [notice, setNotice] = useState("");
   const [search, setSearch] = useState("");
@@ -484,6 +485,10 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
       apiGet("/library", orgId),
     ];
     const jobIndexes = {};
+    if (role === "admin") {
+      jobIndexes.archivedClasses = jobs.push(apiGet("/classes?status=archived&limit=100", orgId)) - 1;
+      jobIndexes.archivedCourses = jobs.push(apiGet("/courses?status=archived&limit=100", orgId)) - 1;
+    }
     if (role === "admin" || role === "teacher" || role === "student") {
       jobIndexes.attendance = jobs.push(apiGet("/classes/attendance?limit=200", orgId)) - 1;
     }
@@ -491,7 +496,7 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
       jobIndexes.students = jobs.push(apiGet("/students?limit=100", orgId)) - 1;
       jobIndexes.teachers = jobs.push(apiGet("/teachers?limit=100", orgId)) - 1;
     }
-    if (role === "teacher" && (activePage === "people" || activePage === "overview")) {
+    if (role === "teacher") {
       jobIndexes.students = jobs.push(apiGet("/students?limit=100", orgId)) - 1;
     }
     Promise.all(jobs)
@@ -500,6 +505,8 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
         setData({
           classes: results[0].data || [],
           courses: results[1].data || [],
+          archivedClasses: jobIndexes.archivedClasses !== undefined ? results[jobIndexes.archivedClasses]?.data || [] : [],
+          archivedCourses: jobIndexes.archivedCourses !== undefined ? results[jobIndexes.archivedCourses]?.data || [] : [],
           assignments: results[2]?.data || [],
           library: results[3]?.data || [],
           attendance: jobIndexes.attendance !== undefined ? results[jobIndexes.attendance]?.data || [] : [],
@@ -514,9 +521,28 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [orgId, role, refreshKey, activePage]);
+  }, [orgId, role, refreshKey]);
 
   const refresh = () => setRefreshKey((value) => value + 1);
+  const openEditDialog = (type, item) => {
+    setDialogItem(item);
+    setDialog(`${type}-edit`);
+  };
+  async function updateStatus(type, item, status) {
+    const label = type === "class" ? "class" : "course";
+    const action = status === "archived" ? "archive" : "restore";
+    if (status === "archived" && !window.confirm(`Archive “${item.name}”? Existing records will be retained.`)) return;
+    try {
+      const path = `/${type === "class" ? "classes" : "courses"}/${item._id}`;
+      if (status === "archived") await apiDelete(path, orgId);
+      else await apiPatch(path, { status }, orgId);
+      setError("");
+      showNotice(`The ${label} has been ${action}d.`);
+      refresh();
+    } catch (requestError) {
+      setError(requestError.message);
+    }
+  }
   const showNotice = (text) => {
     setNotice(text);
     window.setTimeout(() => setNotice(""), 3500);
@@ -531,6 +557,19 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
       await apiPost("/courses", body, orgId);
     } else if (type === "class") {
       await apiPost("/classes", body, orgId);
+    } else if (type === "course-edit") {
+      await apiPatch(`/courses/${body.itemId}`, {
+        name: body.name,
+        code: body.code,
+        description: body.description,
+      }, orgId);
+    } else if (type === "class-edit") {
+      await apiPatch(`/classes/${body.itemId}`, {
+        name: body.name,
+        courseId: body.courseId,
+        teacherMembershipId: body.teacherMembershipId,
+        capacity: body.capacity,
+      }, orgId);
     } else if (type === "timetable") {
       await apiPatch(`/classes/${body.classId}/timetable`, { timetable: body.timetable }, orgId);
     } else if (type === "timetable-request") {
@@ -544,6 +583,8 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
       teacher: "The teacher has been added to your school.",
       course: "The course has been created.",
       class: "The class has been created.",
+      "course-edit": "The course has been updated.",
+      "class-edit": "The class has been updated.",
       timetable: "The class timetable has been saved.",
       "timetable-request": "The timetable change has been sent to the school admin for approval.",
       enroll: "The student has been enrolled in the class.",
@@ -655,17 +696,18 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
         </header>
 
         <div className="dashboard-content">
-          <div className="welcome-row">
-            <div><p className="eyebrow">{dayLabel.toUpperCase()}</p><h1>{greeting}, {person.firstName}<span className="wave">✳</span></h1><p className="muted welcome-subtitle">{role === "admin" ? "Here's what's happening across your school." : role === "teacher" ? "Your classes and learners, all in one place." : "Your learning journey, all in one place."}</p></div>
+          <div className={`welcome-row ${activePage === "overview" ? "welcome-row-overview" : ""}`}>
+            <div className="welcome-copy"><p className="eyebrow">{dayLabel.toUpperCase()}</p><h1>{greeting}, {person.firstName}<span className="wave">✳</span></h1><p className="muted welcome-subtitle">{role === "admin" ? "Here's what's happening across your school." : role === "teacher" ? "Your classes and learners, all in one place." : "Your learning journey, all in one place."}</p></div>
+            {activePage === "overview" && <div className="welcome-highlight"><span className="welcome-highlight-icon"><Sparkles size={19} /></span><span><strong>Learn. Grow. Succeed.</strong><small>Everything you need, in one place.</small></span></div>}
           </div>
 
           {error && <div className="error-banner" role="alert"><span>{error}</span><button className="button button-small" onClick={refresh}>Try again</button></div>}
           {notice && <div className="notice-banner" role="status"><Check size={17} />{notice}<button aria-label="Dismiss notification" onClick={() => setNotice("")}><X size={16} /></button></div>}
 
           {activePage === "overview" && <Overview role={role} data={data} loading={loading} onNavigate={setActivePage} onEnroll={() => setDialog("enroll")} onOpenClass={openClass} />}
-          {activePage === "classes" && <ClassesPage role={role} classes={visibleClasses} loading={loading} search={search} setSearch={setSearch} onCreate={() => setDialog("class")} onEnroll={() => setDialog("enroll")} onOpenClass={openClass} />}
+          {activePage === "classes" && <ClassesPage role={role} classes={visibleClasses} archivedClasses={data.archivedClasses} loading={loading} search={search} setSearch={setSearch} onCreate={() => setDialog("class")} onEdit={(item) => openEditDialog("class", item)} onStatusChange={(item, status) => updateStatus("class", item, status)} onEnroll={() => setDialog("enroll")} onOpenClass={openClass} />}
           {activePage === "timetable" && <TimetablePage role={role} classes={data.classes} attendance={data.attendance} loading={loading} onConfigure={configureTimetable} onReview={reviewTimetableRequest} onRecordAttendance={(session) => setAttendanceDialog(session)} />}
-          {activePage === "courses" && <CoursesPage courses={data.courses} loading={loading} role={role} onCreate={() => setDialog("course")} />}
+          {activePage === "courses" && <CoursesPage courses={data.courses} archivedCourses={data.archivedCourses} loading={loading} role={role} onCreate={() => setDialog("course")} onEdit={(item) => openEditDialog("course", item)} onStatusChange={(item, status) => updateStatus("course", item, status)} />}
           {activePage === "people" && <PeoplePage role={role} data={data} loading={loading} onCreate={(type) => setDialog(type)} onOpenPerson={openPerson} search={search} setSearch={setSearch} />}
           {activePage === "assignments" && <AssignmentPage role={role} assignments={data.assignments} classes={data.classes} loading={loading} organizationId={orgId} onRefresh={refresh} selectedAssignmentId={pendingAssignmentId} onAssignmentOpened={() => setPendingAssignmentId("")} />}
           {activePage === "library" && <LibraryPage role={role} items={data.library} loading={loading} organizationId={orgId} onRefresh={refresh} />}
@@ -674,7 +716,11 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
         </div>
       </main>
 
-      {dialog && <ActionDialog type={dialog} initialClassId={dialogClassId} courses={data.courses} teachers={data.teachers} students={data.students} classes={data.classes} onClose={() => setDialog("")} onSubmit={submitCreate} />}
+      {dialog && <ActionDialog type={dialog} initialItem={dialogItem} initialClassId={dialogClassId} courses={data.courses.filter((item) => item.status === "active")} teachers={data.teachers} students={data.students} classes={data.classes} onClose={() => { setDialog(""); setDialogItem(null); }} onSubmit={submitCreate} />}
+      {role === "student" && auth.mustChangePassword && <PasswordChangeDialog
+        organizationId={orgId}
+        onComplete={() => onAuthChange((current) => ({ ...current, mustChangePassword: false }))}
+      />}
       {attendanceDialog && <AttendanceDialog session={attendanceDialog} onClose={() => setAttendanceDialog(null)} onSubmit={saveAttendance} />}
       {details && <DetailsDialog details={details} organizationId={orgId} onClose={() => setDetails(null)} />}
       {settingsOpen && <SettingsDialog auth={auth} onAuthChange={onAuthChange} darkMode={darkMode} onToggleTheme={onToggleTheme} organizationId={orgId} onClose={() => setSettingsOpen(false)} />}
@@ -697,7 +743,7 @@ function Overview({ role, data, loading, onNavigate, onEnroll, onOpenClass }) {
     ] : []),
   ];
   return (
-    <>
+    <div className="overview-page">
       <div className={`metric-grid ${cards.length === 3 ? "metric-three" : ""}`}>
         {cards.map(({ label, value, icon: Icon, tone, trend, page }, index) => (
           <button className="metric-card" key={label} onClick={() => onNavigate(page)} style={{ animationDelay: `${index * 70}ms` }}>
@@ -727,7 +773,7 @@ function Overview({ role, data, loading, onNavigate, onEnroll, onOpenClass }) {
         <div className="panel learning-panel"><div className="panel-heading"><div><p className="eyebrow">A LITTLE REMINDER</p><h3>Every step counts.</h3></div><span className="sparkle-stamp"><Sparkles size={18} /></span></div><p>Progress isn't always a straight line. Keep showing up, keep asking questions, and celebrate the small wins along the way.</p><div className="panel-signoff"><span className="signoff-mark">a.</span><span>We're cheering you on.</span></div></div>
         <div className="panel quick-panel"><div><p className="eyebrow">QUICK ACCESS</p><h3>Pick up where you left off</h3></div><div className="quick-links"><button onClick={() => onNavigate("courses")}><span className="quick-icon peach"><BookOpen size={17} /></span><span><strong>Browse courses</strong><small>Find your learning path</small></span><ArrowRight size={16} /></button><button onClick={() => onNavigate("classes")}><span className="quick-icon green"><School size={17} /></span><span><strong>Explore classes</strong><small>See what's on your schedule</small></span><ArrowRight size={16} /></button></div></div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -1038,28 +1084,37 @@ function AttendanceDialog({ session, onClose, onSubmit }) {
   );
 }
 
-function ClassesPage({ role, classes, loading, search, setSearch, onCreate, onEnroll, onOpenClass }) {
+function ClassesPage({ role, classes, archivedClasses, loading, search, setSearch, onCreate, onEdit, onStatusChange, onEnroll, onOpenClass }) {
+  const [showArchived, setShowArchived] = useState(false);
+  const visible = (showArchived ? archivedClasses : classes).filter((item) => {
+    const text = `${item.name} ${item.course?.name || ""} ${item.course?.code || ""}`.toLowerCase();
+    return text.includes(search.toLowerCase());
+  });
   return (
     <>
       <div className="page-heading"><div><p className="eyebrow">THE PEOPLE & PLACES</p><h2>Classes</h2><p className="muted">A home for curiosity, community, and a little bit of magic.</p></div><div className="classes-page-actions">{role === "admin" && <button className="button button-primary" onClick={onCreate}><Plus size={17} />Create class</button>}<div className="search-control"><Search size={16} /><input aria-label="Search classes" placeholder="Find a class…" value={search} onChange={(event) => setSearch(event.target.value)} /></div></div></div>
-      {loading ? <LoadingCards /> : classes.length === 0 ? <EmptyState icon={School} title="No classes found" text={role === "admin" ? "Try another search or create a class to get started." : "No classes match your search. Try another name or course."} /> : <div className="class-grid class-grid-all">{classes.map((item, index) => <ClassCard key={item._id} schoolClass={item} index={index} onOpen={() => onOpenClass(item)} />)}</div>}
+      {role === "admin" && <div className="management-filter"><button className={!showArchived ? "selected" : ""} onClick={() => setShowArchived(false)}>Active ({classes.length})</button><button className={showArchived ? "selected" : ""} onClick={() => setShowArchived(true)}>Archived ({archivedClasses.length})</button></div>}
+      {loading ? <LoadingCards /> : visible.length === 0 ? <EmptyState icon={School} title={showArchived ? "No archived classes" : "No classes found"} text={role === "admin" ? "Create a class or adjust your search to get started." : "No classes match your search. Try another name or course."} /> : <div className="class-grid class-grid-all">{visible.map((item, index) => <article className="class-management-card" key={item._id}><ClassCard schoolClass={item} index={index} onOpen={() => onOpenClass(item)} />{role === "admin" && <div className="management-actions">{!showArchived && <button type="button" onClick={() => onEdit(item)}>Edit</button>}<button type="button" onClick={() => onStatusChange(item, showArchived ? "active" : "archived")}>{showArchived ? "Restore" : "Archive"}</button></div>}</article>)}</div>}
       {role === "admin" && <div className="inline-hint"><span className="hint-icon"><Users size={17} /></span><span><strong>Quick enrollment</strong><small>Add an existing student to one of your classes.</small></span><button className="text-button" onClick={onEnroll}>Enroll a student <ArrowRight size={15} /></button></div>}
     </>
   );
 }
 
-function CoursesPage({ courses, loading, role, onCreate }) {
+function CoursesPage({ courses, archivedCourses, loading, role, onCreate, onEdit, onStatusChange }) {
+  const [showArchived, setShowArchived] = useState(false);
+  const visible = showArchived ? archivedCourses : courses;
   return (
     <>
       <div className="page-heading"><div><p className="eyebrow">GROW AT YOUR OWN PACE</p><h2>Courses</h2><p className="muted">Every new idea opens another door.</p></div>{role === "admin" && <button className="button button-primary" onClick={onCreate}><Plus size={17} />New course</button>}</div>
-      {loading ? <LoadingCards /> : courses.length === 0 ? <EmptyState icon={BookOpen} title="Your course library is ready" text={role === "admin" ? "Add your first course and start shaping the school curriculum." : "Courses connected to your classes will show up here."} action={role === "admin" ? <button className="button button-primary button-small" onClick={onCreate}><Plus size={15} />Create a course</button> : null} /> : (
-        <div className="course-list"><CourseRows courses={courses} /></div>
+      {role === "admin" && <div className="management-filter"><button className={!showArchived ? "selected" : ""} onClick={() => setShowArchived(false)}>Active ({courses.length})</button><button className={showArchived ? "selected" : ""} onClick={() => setShowArchived(true)}>Archived ({archivedCourses.length})</button></div>}
+      {loading ? <LoadingCards /> : visible.length === 0 ? <EmptyState icon={BookOpen} title={showArchived ? "No archived courses" : "Your course library is ready"} text={role === "admin" ? "Add your first course and start shaping the school curriculum." : "Courses connected to your classes will show up here."} action={role === "admin" && !showArchived ? <button className="button button-primary button-small" onClick={onCreate}><Plus size={15} />Create a course</button> : null} /> : (
+        <div className="course-list"><CourseRows courses={visible} role={role} onEdit={onEdit} onStatusChange={(item) => onStatusChange(item, showArchived ? "active" : "archived")} showArchived={showArchived} /></div>
       )}
     </>
   );
 }
 
-function CourseRows({ courses }) {
+function CourseRows({ courses, role, onEdit, onStatusChange, showArchived }) {
   return courses.map((course, index) => (
     <article className="course-row" key={course._id}>
       <div className={`course-illustration course-tone-${index % 4}`}><BookOpen size={21} /></div>
@@ -1068,6 +1123,7 @@ function CourseRows({ courses }) {
         <p>{course.description || "A space to discover, practise, and grow."}</p>
       </div>
       <span className="course-code">{course.code}</span>
+      {role === "admin" && <div className="management-actions"><button type="button" onClick={() => onEdit(course)}>Edit</button><button type="button" onClick={() => onStatusChange(course)}>{showArchived ? "Restore" : "Archive"}</button></div>}
       <span className="course-row-arrow"><ArrowUpRight size={17} /></span>
     </article>
   ));
@@ -1372,12 +1428,95 @@ function EditOrganizationDialog({ organization, onClose, onSubmit }) {
   );
 }
 
-function ActionDialog({ type, initialClassId = "", courses = [], teachers = [], students = [], classes = [], onClose, onSubmit }) {
+function PasswordChangeDialog({ organizationId, onComplete }) {
+  const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
+  const dialogRef = useRef(null);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    const focusable = dialog?.querySelectorAll("input, button");
+    const first = focusable?.[0];
+    const last = focusable?.[focusable.length - 1];
+    first?.focus();
+    const keepFocusInDialog = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        return;
+      }
+      if (event.key !== "Tab" || !first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", keepFocusInDialog);
+    return () => document.removeEventListener("keydown", keepFocusInDialog);
+  }, []);
+
+  async function submit(event) {
+    event.preventDefault();
+    setError("");
+    const formData = new FormData(event.currentTarget);
+    const newPassword = String(formData.get("newPassword") || "");
+    const confirmPassword = String(formData.get("confirmPassword") || "");
+    if (newPassword !== confirmPassword) {
+      setError("The passwords do not match.");
+      return;
+    }
+
+    setPending(true);
+    try {
+      await apiPatch("/auth/password", { newPassword }, organizationId);
+      onComplete();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop password-change-backdrop">
+      <section ref={dialogRef} className="modal password-change-modal" role="dialog" aria-modal="true" aria-labelledby="password-change-title">
+        <div className="modal-heading">
+          <div>
+            <p className="eyebrow">SECURE YOUR ACCOUNT</p>
+            <h2 id="password-change-title">Create a new password</h2>
+            <p>Before continuing, choose a password only you know.</p>
+          </div>
+        </div>
+        <form className="modal-form" onSubmit={submit}>
+          <FormField label="New password">
+            <input autoFocus required minLength="12" maxLength="128" type="password" name="newPassword" autoComplete="new-password" />
+            <small>Use at least 12 characters.</small>
+          </FormField>
+          <FormField label="Confirm new password">
+            <input required minLength="12" maxLength="128" type="password" name="confirmPassword" autoComplete="new-password" />
+          </FormField>
+          {error && <div className="form-error" role="alert">{error}</div>}
+          <div className="modal-actions">
+            <button className="button button-primary" type="submit" disabled={pending}>
+              {pending ? <><span className="spinner" />Saving password…</> : <>Save password<ArrowRight size={16} /></>}
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+function ActionDialog({ type, initialItem = null, initialClassId = "", courses = [], teachers = [], students = [], classes = [], onClose, onSubmit }) {
   const config = {
     student: { title: "Welcome a student", subtitle: "Create their account and student profile.", button: "Add student" },
     teacher: { title: "Welcome a teacher", subtitle: "Create their account and teaching profile.", button: "Add teacher" },
     course: { title: "Create a course", subtitle: "Add a new subject to your school.", button: "Create course" },
+    "course-edit": { title: "Edit course", subtitle: "Update the course details for your school.", button: "Save course" },
     class: { title: "Create a class", subtitle: "Choose a course, teacher, and class size.", button: "Create class" },
+    "class-edit": { title: "Edit class", subtitle: "Update the class name, course, teacher, or capacity.", button: "Save class" },
     timetable: { title: "Edit class timetable", subtitle: "Update the published weekly times and Google Meet links.", button: "Save timetable" },
     "timetable-request": { title: "Request a timetable change", subtitle: "Your proposal will be sent to the school admin for approval.", button: "Send for approval" },
     enroll: { title: "Enroll a student", subtitle: "Add a student to one of your classes.", button: "Enroll student" },
@@ -1431,15 +1570,17 @@ function ActionDialog({ type, initialClassId = "", courses = [], teachers = [], 
         if (value("employeeId")) body.employeeId = value("employeeId");
         if (value("specialization")) body.specialization = value("specialization");
       }
-    } else if (type === "course") {
+    } else if (type === "course" || type === "course-edit") {
       body.name = value("name");
       body.code = value("code");
       body.description = value("description");
-    } else if (type === "class") {
+      if (initialItem) body.itemId = initialItem._id;
+    } else if (type === "class" || type === "class-edit") {
       body.name = value("name");
       body.courseId = value("courseId");
       body.teacherMembershipId = value("teacherMembershipId");
       body.capacity = Number(value("capacity") || 30);
+      if (initialItem) body.itemId = initialItem._id;
     } else if (type === "enroll") {
       body.classId = selectedClass;
       body.studentMembershipId = value("studentMembershipId");
@@ -1500,8 +1641,8 @@ function ActionDialog({ type, initialClassId = "", courses = [], teachers = [], 
             </>}
             {type === "teacher" && <><div className="form-section-title">TEACHER DETAILS <span>OPTIONAL</span></div><div className="form-two"><FormField label="Employee ID"><input name="employeeId" /></FormField><FormField label="Specialization"><input name="specialization" /></FormField></div></>}
           </>}
-          {type === "course" && <><FormField label="Course name"><input autoFocus required name="name" maxLength="120" placeholder="e.g. English language" /></FormField><FormField label="Course code"><input required name="code" maxLength="32" placeholder="e.g. ENG-101" /></FormField><FormField label="Description"><textarea name="description" rows="3" maxLength="2000" placeholder="What will students explore in this course?" /></FormField></>}
-          {type === "class" && <><FormField label="Class name"><input autoFocus required name="name" maxLength="120" placeholder="e.g. Year 8 · Blue group" /></FormField><FormField label="Course"><select required name="courseId" defaultValue=""><option value="" disabled>Choose a course</option>{courses.map((item) => <option key={item._id} value={item._id}>{item.name} · {item.code}</option>)}</select>{courses.length === 0 && <small>Create a course first to use it in a class.</small>}</FormField><FormField label="Assigned teacher"><select required name="teacherMembershipId" defaultValue=""><option value="" disabled>Choose a teacher</option>{teachers.map((item) => <option key={item._id} value={item._id}>{fullName(item.user)}</option>)}</select>{teachers.length === 0 && <small>Add a teacher first to assign one to this class.</small>}</FormField><FormField label="Class capacity"><input type="number" required name="capacity" min="1" max="1000" defaultValue="30" /></FormField></>}
+          {(type === "course" || type === "course-edit") && <><FormField label="Course name"><input autoFocus required name="name" maxLength="120" placeholder="e.g. English language" defaultValue={initialItem?.name || ""} /></FormField><FormField label="Course code"><input required name="code" maxLength="32" placeholder="e.g. ENG-101" defaultValue={initialItem?.code || ""} /></FormField><FormField label="Description"><textarea name="description" rows="3" maxLength="2000" placeholder="What will students explore in this course?" defaultValue={initialItem?.description || ""} /></FormField></>}
+          {(type === "class" || type === "class-edit") && <><FormField label="Class name"><input autoFocus required name="name" maxLength="120" placeholder="e.g. Year 8 · Blue group" defaultValue={initialItem?.name || ""} /></FormField><FormField label="Course"><select required name="courseId" defaultValue={initialItem?.course?._id || ""}><option value="" disabled>Choose a course</option>{courses.map((item) => <option key={item._id} value={item._id}>{item.name} · {item.code}</option>)}</select>{courses.length === 0 && <small>Create a course first to use it in a class.</small>}</FormField><FormField label="Assigned teacher"><select required name="teacherMembershipId" defaultValue={initialItem?.teacher?._id || ""}><option value="" disabled>Choose a teacher</option>{teachers.map((item) => <option key={item._id} value={item._id}>{fullName(item.user)}</option>)}</select>{teachers.length === 0 && <small>Add a teacher first to assign one to this class.</small>}</FormField><FormField label="Class capacity"><input type="number" required name="capacity" min="1" max="1000" defaultValue={initialItem?.capacity || 30} /></FormField></>}
           {type === "enroll" && <><FormField label="Class"><select required value={selectedClass} onChange={(event) => setSelectedClass(event.target.value)}><option value="" disabled>Choose a class</option>{classes.map((item) => <option key={item._id} value={item._id}>{item.name}</option>)}</select>{classes.length === 0 && <small>Create a class before enrolling students.</small>}</FormField><FormField label="Student"><select required name="studentMembershipId" defaultValue=""><option value="" disabled>Choose a student</option>{students.map((item) => <option key={item._id} value={item._id}>{fullName(item.user)} · {item.user?.email}</option>)}</select>{students.length === 0 && <small>Add a student before enrolling.</small>}</FormField></>}
           {(type === "timetable" || type === "timetable-request") && <>
             <FormField label="Class">
@@ -1557,7 +1698,7 @@ function ActionDialog({ type, initialClassId = "", courses = [], teachers = [], 
           </>}
           {type === "organization" && <><div className="form-two"><FormField label="School name"><input autoFocus required name="name" maxLength="120" placeholder="e.g. Northfield Academy" /></FormField><FormField label="School slug"><input required name="slug" maxLength="80" pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="northfield-academy" /><small>Used when school members sign in.</small></FormField></div><div className="form-section-title">FIRST SCHOOL ADMIN</div><div className="form-two"><FormField label="First name"><input required name="adminFirstName" /></FormField><FormField label="Last name"><input required name="adminLastName" /></FormField></div><FormField label="Admin email"><input required type="email" name="adminEmail" /></FormField><FormField label="Temporary password"><input required minLength="12" maxLength="128" type="password" name="adminPassword" autoComplete="new-password" /><small>At least 12 characters. Share it securely with the administrator.</small></FormField></>}
           {formError && <div className="form-error" role="alert">{formError}</div>}
-          <div className="modal-actions"><button className="button button-quiet" type="button" disabled={pending} onClick={onClose}>Cancel</button><button className="button button-primary" type="submit" disabled={pending || (type === "class" && (!courses.length || !teachers.length)) || (type === "enroll" && (!classes.length || !students.length)) || ((type === "timetable" || type === "timetable-request") && !classes.length)}>{pending ? <><span className="spinner" />{type === "student" ? "Adding student…" : type === "teacher" ? "Adding teacher…" : type === "course" ? "Creating course…" : type === "class" ? "Creating class…" : "Saving…"}</> : <>{config.button}<ArrowRight size={16} /></>}</button></div>
+          <div className="modal-actions"><button className="button button-quiet" type="button" disabled={pending} onClick={onClose}>Cancel</button><button className="button button-primary" type="submit" disabled={pending || ((type === "class" || type === "class-edit") && (!courses.length || !teachers.length)) || (type === "enroll" && (!classes.length || !students.length)) || ((type === "timetable" || type === "timetable-request") && !classes.length)}>{pending ? <><span className="spinner" />{type === "student" ? "Adding student…" : type === "teacher" ? "Adding teacher…" : type === "course" ? "Creating course…" : type === "class" ? "Creating class…" : "Saving…"}</> : <>{config.button}<ArrowRight size={16} /></>}</button></div>
         </form>
         )}
       </section>

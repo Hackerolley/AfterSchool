@@ -14,3 +14,7 @@ export const platformAdminLoginSchema = z.object({
   email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
   password: z.string().min(1).max(128),
 }).strict();
+
+export const changePasswordSchema = z.object({
+  newPassword: z.string().min(12).max(128),
+}).strict();

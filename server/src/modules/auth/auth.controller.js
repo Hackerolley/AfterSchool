@@ -1,6 +1,6 @@
 import { Membership } from "../memberships/membership.model.js";
 import { Organization } from "../organizations/organization.model.js";
-import { User } from "../users/user.model.js";
+import { hashPassword, User } from "../users/user.model.js";
 import { rotateCsrfToken } from "../../middleware/csrf.js";
 import { HttpError } from "../../utils/http-error.js";
 
@@ -54,6 +54,7 @@ export async function login(req, res) {
         logoUrl: membership.organization.logoUrl,
       },
       role: membership.role,
+      mustChangePassword: membership.mustChangePassword,
       csrfToken: req.session.csrfToken,
     },
   });
@@ -95,6 +96,25 @@ export function platformMe(req, res) {
   });
 }
 
+export async function changeStudentPassword(req, res) {
+  const [user, membership] = await Promise.all([
+    User.findById(req.user._id),
+    Membership.findOne({
+      _id: req.membership._id,
+      organization: req.organization._id,
+      role: "student",
+      status: "active",
+    }),
+  ]);
+  if (!user || !membership) throw new HttpError(404, "Student account not found");
+
+  user.passwordHash = await hashPassword(req.body.newPassword);
+  await user.save();
+  membership.mustChangePassword = false;
+  await membership.save();
+  res.json({ success: true, data: { mustChangePassword: false } });
+}
+
 export async function logout(req, res) {
   await new Promise((resolve, reject) => {
     req.session.destroy((error) => (error ? reject(error) : resolve()));
@@ -115,6 +135,7 @@ export function me(req, res) {
         logoUrl: req.organization.logoUrl,
       },
       role: req.membership.role,
+      mustChangePassword: req.membership.mustChangePassword,
     },
   });
 }

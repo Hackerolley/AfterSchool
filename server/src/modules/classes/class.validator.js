@@ -66,6 +66,16 @@ export const createClassSchema = z.object({
   timetable: z.array(timetableEntrySchema).max(14).default([]),
 }).strict();
 
+export const updateClassSchema = z.object({
+  courseId: z.string().regex(/^[a-f\d]{24}$/i),
+  name: z.string().trim().min(1).max(120),
+  teacherMembershipId: z.string().regex(/^[a-f\d]{24}$/i),
+  capacity: z.number().int().min(1).max(1000),
+  status: z.enum(["active", "archived"]),
+}).partial().strict().refine((value) => Object.keys(value).length > 0, {
+  message: "At least one class field is required",
+});
+
 export const updateClassTimetableSchema = z.object({
   timetable: z.array(timetableEntrySchema).max(14),
 }).strict();
