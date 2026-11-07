@@ -43,7 +43,7 @@ export async function requireOrganization(req, res, next) {
       user: req.user._id,
       organization: organizationId,
       status: "active",
-    }).populate("organization", "name slug status logoUrl");
+    }).populate("organization", "name slug status logoUrl idFormats");
 
     if (!membership || membership.organization.status !== "active") {
       throw new HttpError(403, "Active membership in this organization is required");

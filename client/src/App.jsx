@@ -56,6 +56,11 @@ const SCHOOL_KEY = "afterschool.school";
 const MODE_KEY = "afterschool.mode";
 const THEME_KEY = "afterschool.theme";
 const roleNames = { admin: "School admin", teacher: "Teacher", student: "Student" };
+const countryDisplayNames = new Intl.DisplayNames(["en"], { type: "region" });
+const countryCodes = `AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY HK HM HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ VA VC VE VG VI VN VU WF WS YE YT ZA ZM ZW`;
+const residenceCountries = countryCodes.split(" ").map((code) => [code, countryDisplayNames.of(code)]);
+const countryNameByCode = new Map(residenceCountries.map(([code, name]) => [code, name]));
+const countryCodeByName = new Map(residenceCountries.map(([code, name]) => [name.toLowerCase(), code]));
 const navigation = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "classes", label: "My classes", icon: School },
@@ -76,6 +81,12 @@ function assignmentDueLabel(date) {
     : `Due ${new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(due)}`;
 }
 
+function dateInputValue(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString().slice(0, 10);
+}
+
 function readSchool() {
   try {
     return JSON.parse(localStorage.getItem(SCHOOL_KEY) || "null");
@@ -91,6 +102,16 @@ function fullName(user) {
 
 function initials(user) {
   return [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join("").toUpperCase() || "AS";
+}
+
+function countryOfResidenceValue(value) {
+  const countryCode = String(value || "").toUpperCase();
+  return countryNameByCode.get(countryCode) || value || "";
+}
+
+function countryOfResidenceCode(value) {
+  const country = String(value || "").trim();
+  return countryCodeByName.get(country.toLowerCase()) || (/^[a-z]{2}$/i.test(country) ? country.toUpperCase() : country);
 }
 
 function App() {
@@ -211,6 +232,39 @@ function SettingsDialog({ auth, onAuthChange, darkMode, onToggleTheme, organizat
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const canManageLogo = auth.mode === "school" && auth.role === "admin";
+  const [idFormats, setIdFormats] = useState({
+    student: "ST-{DD}{MM}{YY}{SEQ:3}",
+    teacher: "IN-{DD}{MM}{YY}{SEQ:3}",
+  });
+
+  useEffect(() => {
+    if (!canManageLogo) return;
+    let active = true;
+    apiGet("/settings/school", organizationId)
+      .then((response) => {
+        if (active && response.data.idFormats) setIdFormats(response.data.idFormats);
+      })
+      .catch((requestError) => {
+        if (active) setError(requestError.message);
+      });
+    return () => { active = false; };
+  }, [canManageLogo, organizationId]);
+
+  async function saveIdFormats(event) {
+    event.preventDefault();
+    setSaving("id-formats");
+    setError("");
+    setNotice("");
+    try {
+      const response = await apiPatch("/settings/school/id-formats", idFormats, organizationId);
+      setIdFormats(response.data.idFormats);
+      setNotice("Student and teacher ID formats updated.");
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSaving("");
+    }
+  }
 
   async function uploadImage(kind, file) {
     if (!file) return;
@@ -291,6 +345,12 @@ function SettingsDialog({ auth, onAuthChange, darkMode, onToggleTheme, organizat
               {auth.school.logoUrl && <button className="icon-button" title="Remove school logo" aria-label="Remove school logo" disabled={saving !== ""} onClick={() => removeImage("logo")}><Trash2 size={16} /></button>}
             </div>}
           </section>}
+          {canManageLogo && <form className="settings-id-formats" onSubmit={saveIdFormats}>
+            <div><strong>Student and teacher ID formats</strong><p>Use {"{DD}"}, {"{MM}"}, {"{YY}"} and one {"{SEQ:3}"} token. The sequence continues from the last ID for each role.</p></div>
+            <label><span>Student ID format</span><input required maxLength="40" value={idFormats.student} onChange={(event) => setIdFormats((current) => ({ ...current, student: event.target.value }))} /></label>
+            <label><span>Teacher ID format</span><input required maxLength="40" value={idFormats.teacher} onChange={(event) => setIdFormats((current) => ({ ...current, teacher: event.target.value }))} /></label>
+            <button className="button button-primary button-small" type="submit" disabled={saving === "id-formats"}>{saving === "id-formats" ? "Saving…" : "Save ID formats"}</button>
+          </form>}
           <section className="settings-row">
             <div className="settings-identity"><span className="settings-theme-icon">{darkMode ? <Moon size={18} /> : <Sun size={18} />}</span><div><strong>Night mode</strong><span>Use a darker appearance on this device</span></div></div>
             <button className={`theme-switch ${darkMode ? "is-on" : ""}`} type="button" role="switch" aria-checked={darkMode} aria-label="Night mode" onClick={onToggleTheme}><span /></button>
@@ -1637,7 +1697,7 @@ function ActionDialog({ type, initialItem = null, initialClassId = "", courses =
       if (!editingPerson && value("password")) body.password = value("password");
       if (personType === "student") {
         for (const key of ["dateOfBirth", "gender", "genderDescription", "countryOfResidence", "homeCountry", "phoneNumber", "studentNumber", "guardianName", "guardianEmail", "guardianPhone"]) {
-          const current = value(key);
+          const current = key === "countryOfResidence" ? countryOfResidenceCode(value(key)) : value(key);
           if (editingPerson) body[key] = current || null;
           else if (current) body[key] = current;
         }
@@ -1705,18 +1765,20 @@ function ActionDialog({ type, initialItem = null, initialClassId = "", courses =
           {personType && <>
             <div className="form-two"><FormField label="First name"><input autoFocus required name="firstName" autoComplete="given-name" defaultValue={initialItem?.user?.firstName || ""} /></FormField><FormField label="Last name"><input required name="lastName" autoComplete="family-name" defaultValue={initialItem?.user?.lastName || ""} /></FormField></div>
             <FormField label="Email address"><input required type="email" name="email" autoComplete="email" defaultValue={initialItem?.user?.email || ""} /></FormField>
-            {!editingPerson && <FormField label="Temporary password"><input minLength="12" maxLength="128" type="password" name="password" autoComplete="new-password" /><small>For a new account, enter at least 12 characters. Leave blank to add an account that already exists in another school.</small></FormField>}
+            {!editingPerson && <p className="temporary-password-note">Temporary password: <strong>{personType}password</strong>. They will be asked to change it after their first login.</p>}
             {personType === "student" && <>
               <div className="form-section-title">STUDENT DETAILS <span>OPTIONAL</span></div>
-              <div className="form-two"><FormField label="Date of birth"><input type="date" name="dateOfBirth" max={new Date().toISOString().slice(0, 10)} defaultValue={initialItem?.profile?.dateOfBirth ? new Date(initialItem.profile.dateOfBirth).toISOString().slice(0, 10) : ""} /></FormField><FormField label="Phone number"><input name="phoneNumber" type="tel" placeholder="+44 20 1234 5678" defaultValue={initialItem?.profile?.phoneNumber || ""} /></FormField></div>
+              <div className="form-two"><FormField label="Date of birth"><input type="date" name="dateOfBirth" max={new Date().toISOString().slice(0, 10)} defaultValue={dateInputValue(initialItem?.profile?.dateOfBirth)} /></FormField><FormField label="Phone number"><input name="phoneNumber" type="tel" placeholder="+44 20 1234 5678" defaultValue={initialItem?.profile?.phoneNumber || ""} /></FormField></div>
               <div className="form-two"><FormField label="Gender"><select name="gender" value={gender} onChange={(event) => setGender(event.target.value)}><option value="">Select gender</option><option value="female">Female</option><option value="male">Male</option><option value="non_binary">Non-binary</option><option value="self_described">Self-described</option><option value="prefer_not_to_say">Prefer not to say</option></select></FormField><FormField label="If self-described"><input name="genderDescription" required={gender === "self_described"} maxLength="80" placeholder="Your description" disabled={gender !== "self_described"} defaultValue={initialItem?.profile?.genderDescription || ""} /></FormField></div>
-              <div className="form-two"><FormField label="Country of residence"><input name="countryOfResidence" maxLength="2" placeholder="GB" defaultValue={initialItem?.profile?.countryOfResidence || ""} /></FormField><FormField label="Home country"><input name="homeCountry" maxLength="2" placeholder="NG" defaultValue={initialItem?.profile?.homeCountry || ""} /></FormField></div>
-              <FormField label="Student number"><input name="studentNumber" maxLength="40" defaultValue={initialItem?.profile?.studentNumber || ""} /></FormField>
+              <div className="form-two"><FormField label="Country of residence"><input name="countryOfResidence" list="country-options" maxLength="80" placeholder="Choose or type a country" defaultValue={countryOfResidenceValue(initialItem?.profile?.countryOfResidence)} /><datalist id="country-options">{residenceCountries.map(([code, name]) => <option key={code} value={name} />)}</datalist><small>Select a suggestion or enter a country name or code.</small></FormField><FormField label="Home country"><input name="homeCountry" maxLength="2" placeholder="NG" defaultValue={initialItem?.profile?.homeCountry || ""} /></FormField></div>
+              {editingPerson
+                ? <FormField label="Student number"><input name="studentNumber" maxLength="40" defaultValue={initialItem?.profile?.studentNumber || ""} /></FormField>
+                : <p className="generated-id-note">Student number is generated automatically using your school’s ID format.</p>}
               <div className="form-section-title">GUARDIAN CONTACT <span>OPTIONAL</span></div>
               <FormField label="Guardian name"><input name="guardianName" defaultValue={initialItem?.profile?.guardianName || ""} /></FormField>
               <div className="form-two"><FormField label="Guardian email"><input type="email" name="guardianEmail" defaultValue={initialItem?.profile?.guardianEmail || ""} /></FormField><FormField label="Guardian phone"><input type="tel" name="guardianPhone" defaultValue={initialItem?.profile?.guardianPhone || ""} /></FormField></div>
             </>}
-            {personType === "teacher" && <><div className="form-section-title">TEACHER DETAILS <span>OPTIONAL</span></div><div className="form-two"><FormField label="Employee ID"><input name="employeeId" defaultValue={initialItem?.profile?.employeeId || ""} /></FormField><FormField label="Specialization"><input name="specialization" defaultValue={initialItem?.profile?.specialization || ""} /></FormField></div><FormField label="Qualifications"><input name="qualifications" placeholder="Separate qualifications with commas" defaultValue={initialItem?.profile?.qualifications?.join(", ") || ""} /></FormField></>}
+            {personType === "teacher" && <><div className="form-section-title">TEACHER DETAILS <span>OPTIONAL</span></div><div className="form-two">{editingPerson ? <FormField label="Teacher ID"><input name="employeeId" defaultValue={initialItem?.profile?.employeeId || ""} /></FormField> : <p className="generated-id-note">Teacher ID is generated automatically using your school’s ID format.</p>}<FormField label="Specialization"><input name="specialization" defaultValue={initialItem?.profile?.specialization || ""} /></FormField></div><FormField label="Qualifications"><input name="qualifications" placeholder="Separate qualifications with commas" defaultValue={initialItem?.profile?.qualifications?.join(", ") || ""} /></FormField></>}
           </>}
           {(type === "course" || type === "course-edit") && <><FormField label="Course name"><input autoFocus required name="name" maxLength="120" placeholder="e.g. English language" defaultValue={initialItem?.name || ""} /></FormField><FormField label="Course code"><input required name="code" maxLength="32" placeholder="e.g. ENG-101" defaultValue={initialItem?.code || ""} /></FormField><FormField label="Description"><textarea name="description" rows="3" maxLength="2000" placeholder="What will students explore in this course?" defaultValue={initialItem?.description || ""} /></FormField></>}
           {(type === "class" || type === "class-edit") && <><FormField label="Class name"><input autoFocus required name="name" maxLength="120" placeholder="e.g. Year 8 · Blue group" defaultValue={initialItem?.name || ""} /></FormField><FormField label="Course"><select required name="courseId" defaultValue={initialItem?.course?._id || ""}><option value="" disabled>Choose a course</option>{courses.map((item) => <option key={item._id} value={item._id}>{item.name} · {item.code}</option>)}</select>{courses.length === 0 && <small>Create a course first to use it in a class.</small>}</FormField><FormField label="Assigned teacher"><select required name="teacherMembershipId" defaultValue={initialItem?.teacher?._id || ""}><option value="" disabled>Choose a teacher</option>{teachers.map((item) => <option key={item._id} value={item._id}>{fullName(item.user)}</option>)}</select>{teachers.length === 0 && <small>Add a teacher first to assign one to this class.</small>}</FormField><FormField label="Class capacity"><input type="number" required name="capacity" min="1" max="1000" defaultValue={initialItem?.capacity || 30} /></FormField></>}
@@ -1875,11 +1937,11 @@ function DetailsDialog({ details, organizationId, onClose }) {
             <div className="details-summary">
               <DetailItem label="School role" value={details.type === "student" ? "Student" : "Teacher"} />
               {profile?.studentNumber && <DetailItem label="Student number" value={profile.studentNumber} />}
-              {profile?.employeeId && <DetailItem label="Employee ID" value={profile.employeeId} />}
+              {profile?.employeeId && <DetailItem label="Teacher ID" value={profile.employeeId} />}
               {profile?.specialization && <DetailItem label="Specialization" value={profile.specialization} />}
               {profile?.dateOfBirth && <DetailItem label="Date of birth" value={new Intl.DateTimeFormat("en", { dateStyle: "long", timeZone: "UTC" }).format(new Date(profile.dateOfBirth))} />}
               {profile?.gender && <DetailItem label="Gender" value={profile.gender === "self_described" ? profile.genderDescription : genderNames[profile.gender] || profile.gender} />}
-              {profile?.countryOfResidence && <DetailItem label="Country of residence" value={profile.countryOfResidence} />}
+              {profile?.countryOfResidence && <DetailItem label="Country of residence" value={countryOfResidenceValue(profile.countryOfResidence)} />}
               {profile?.homeCountry && <DetailItem label="Home country" value={profile.homeCountry} />}
               {profile?.phoneNumber && <DetailItem label="Phone number" value={profile.phoneNumber} />}
               {profile?.qualifications?.length > 0 && <DetailItem label="Qualifications" value={profile.qualifications.join(", ")} />}

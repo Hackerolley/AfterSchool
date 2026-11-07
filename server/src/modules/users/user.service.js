@@ -3,6 +3,30 @@ import { StudentProfile } from "../students/student-profile.model.js";
 import { TeacherProfile } from "../teachers/teacher-profile.model.js";
 import { hashPassword, User } from "./user.model.js";
 import { HttpError } from "../../utils/http-error.js";
+import { Organization } from "../organizations/organization.model.js";
+import { DEFAULT_MEMBER_ID_FORMATS, formatMemberId } from "./user-id.js";
+
+async function generateMemberId(organizationId, role) {
+  const organization = await Organization.findOneAndUpdate(
+    { _id: organizationId },
+    { $inc: { [`idCounters.${role}`]: 1 } },
+    {
+      new: true,
+      projection: { [`idFormats.${role}`]: 1, [`idCounters.${role}`]: 1 },
+    },
+  );
+  if (!organization) throw new HttpError(404, "School not found");
+
+  const profileModel = role === "student" ? StudentProfile : TeacherProfile;
+  const field = role === "student" ? "studentNumber" : "employeeId";
+  const sequence = organization.idCounters?.[role] || 1;
+  const template = organization.idFormats?.[role] || DEFAULT_MEMBER_ID_FORMATS[role];
+  const memberId = formatMemberId(template, new Date(), sequence);
+  if (await profileModel.exists({ organization: organizationId, [field]: memberId })) {
+    return generateMemberId(organizationId, role);
+  }
+  return memberId;
+}
 
 export async function createOrganizationUser(organizationId, input) {
   let user = await User.findOne({ email: input.email });
@@ -15,14 +39,11 @@ export async function createOrganizationUser(organizationId, input) {
       throw new HttpError(409, "This user is already a member of the organization");
     }
   } else {
-    if (!input.password) {
-      throw new HttpError(400, "A password is required when creating a new account");
-    }
     user = await User.create({
       firstName: input.firstName,
       lastName: input.lastName,
       email: input.email,
-      passwordHash: await hashPassword(input.password),
+      passwordHash: await hashPassword(input.password || `${input.role}password`),
     });
     createdUser = true;
   }
@@ -33,17 +54,20 @@ export async function createOrganizationUser(organizationId, input) {
       organization: organizationId,
       user: user._id,
       role: input.role,
+      mustChangePassword: true,
     });
 
     if (input.role === "teacher") {
+      const employeeId = await generateMemberId(organizationId, "teacher");
       await TeacherProfile.create({
         organization: organizationId,
         membership: membership._id,
-        employeeId: input.employeeId,
+        employeeId,
         qualifications: input.qualifications,
         specialization: input.specialization,
       });
     } else {
+      const studentNumber = await generateMemberId(organizationId, "student");
       await StudentProfile.create({
         organization: organizationId,
         membership: membership._id,
@@ -53,7 +77,7 @@ export async function createOrganizationUser(organizationId, input) {
         countryOfResidence: input.countryOfResidence,
         homeCountry: input.homeCountry,
         phoneNumber: input.phoneNumber,
-        studentNumber: input.studentNumber,
+        studentNumber,
         guardianName: input.guardianName,
         guardianEmail: input.guardianEmail,
         guardianPhone: input.guardianPhone,

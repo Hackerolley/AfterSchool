@@ -6,10 +6,12 @@ import { createApp } from "../src/app.js";
 import { requirePlatformAdmin } from "../src/middleware/authenticate.js";
 import { changePasswordSchema, loginSchema, platformAdminLoginSchema } from "../src/modules/auth/auth.validator.js";
 import { Membership } from "../src/modules/memberships/membership.model.js";
+import { Notification } from "../src/modules/notifications/notification.model.js";
 import {
   createOrganizationSchema,
   listOrganizationMembershipsQuerySchema,
   listOrganizationsQuerySchema,
+  updateMemberIdFormatsSchema,
   updateOrganizationSchema,
   updatePlatformMembershipStatusSchema,
 } from "../src/modules/organizations/organization.validator.js";
@@ -44,6 +46,7 @@ import { createLibraryItemSchema } from "../src/modules/library/library.validato
 import { updateProgressSchema } from "../src/modules/quran/quran.validator.js";
 import { clearQuranTokenCache, fetchQuranContent } from "../src/modules/quran/quran.service.js";
 import { isSupportedImage } from "../src/modules/settings/settings.upload.js";
+import { formatMemberId } from "../src/modules/users/user-id.js";
 
 function makeApp(configOverrides = {}) {
   return createApp({
@@ -68,6 +71,20 @@ test("health check reports MongoDB connectivity", async () => {
     success: true,
     data: { status: "ok", database: "connected" },
   });
+});
+
+test("school ID formats validate and generate dated sequential identifiers", () => {
+  const date = new Date("2026-11-07T12:00:00.000Z");
+  assert.equal(formatMemberId("ST-{DD}{MM}{YY}{SEQ:3}", date, 1), "ST-071126001");
+  assert.equal(formatMemberId("IN-{YY}-{SEQ:4}", date, 12), "IN-26-0012");
+  assert.equal(updateMemberIdFormatsSchema.safeParse({
+    student: "ST-{DD}{MM}{YY}{SEQ:3}",
+    teacher: "IN-{DD}{MM}{YY}{SEQ:3}",
+  }).success, true);
+  assert.equal(updateMemberIdFormatsSchema.safeParse({
+    student: "ST-{DD}{MM}{YY}",
+    teacher: "IN-{SEQ}",
+  }).success, false);
 });
 
 test("private assignment document URLs use authenticated, expiring Cloudinary downloads", () => {
@@ -333,7 +350,32 @@ test("assignment reviews require an integer score from 0 to 100 and allow option
 });
 
 test("notifications require an authenticated school member", async () => {
-  await request(makeApp()).get("/api/v1/notifications").expect(401);
+  const agent = request.agent(makeApp());
+  const csrfResponse = await agent.get("/api/v1/auth/csrf").expect(200);
+  await agent.get("/api/v1/notifications").expect(401);
+  await agent
+    .delete("/api/v1/notifications/read")
+    .set("X-CSRF-Token", csrfResponse.body.data.csrfToken)
+    .expect(401);
+  await agent
+    .delete("/api/v1/notifications/507f1f77bcf86cd799439011")
+    .set("X-CSRF-Token", csrfResponse.body.data.csrfToken)
+    .expect(401);
+});
+
+test("notifications support school updates and auto-expire three days after being read", () => {
+  const notification = new Notification({
+    organization: "507f1f77bcf86cd799439011",
+    recipient: "507f1f77bcf86cd799439012",
+    type: "attendance_marked",
+    class: "507f1f77bcf86cd799439013",
+    title: "Attendance updated",
+    message: "Your attendance was marked present.",
+  });
+  assert.equal(notification.validateSync(), undefined);
+  const readExpiryIndex = Notification.schema.indexes().find(([, options]) => options.expireAfterSeconds);
+  assert.equal(readExpiryIndex[1].expireAfterSeconds, 3 * 24 * 60 * 60);
+  assert.deepEqual(readExpiryIndex[1].partialFilterExpression, { readAt: { $exists: true } });
 });
 
 test("class timetables accept weekly Google Meet sessions and reject unsafe or invalid entries", () => {
@@ -556,9 +598,9 @@ test("unsafe requests require a session CSRF token", async () => {
   assert.equal(response.body.message, "Valid CSRF token required");
 });
 
-test("student accounts require a new password by default and password changes validate securely", () => {
+test("new student and teacher accounts require a password change and password updates validate securely", () => {
   assert.equal(new Membership({ role: "student" }).mustChangePassword, true);
-  assert.equal(new Membership({ role: "teacher" }).mustChangePassword, false);
+  assert.equal(new Membership({ role: "teacher" }).mustChangePassword, true);
   assert.equal(new Membership({ role: "admin" }).mustChangePassword, false);
   assert.equal(changePasswordSchema.safeParse({ newPassword: "a-secure-new-password" }).success, true);
   assert.equal(changePasswordSchema.safeParse({ newPassword: "short" }).success, false);
@@ -665,6 +707,15 @@ test("student profile fields are accepted and country codes are normalized", () 
   assert.equal(result.data.countryOfResidence, "GB");
   assert.equal(result.data.homeCountry, "NG");
   assert.equal(result.data.dateOfBirth.toISOString(), "2012-04-15T00:00:00.000Z");
+  const typedCountry = createUserSchema.safeParse({
+    firstName: "Ada",
+    lastName: "Example",
+    email: "typed-country@example.com",
+    role: "student",
+    countryOfResidence: "Northern Ireland",
+  });
+  assert.equal(typedCountry.success, true);
+  assert.equal(typedCountry.data.countryOfResidence, "Northern Ireland");
 });
 
 test("student profile validation rejects future birthdays and malformed country and phone values", () => {

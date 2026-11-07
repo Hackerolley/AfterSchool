@@ -6,6 +6,16 @@ import { SchoolClass } from "./class.model.js";
 import { User } from "../users/user.model.js";
 import { HttpError } from "../../utils/http-error.js";
 import { paginationResult } from "../../utils/pagination.js";
+import { notifyMemberships } from "../notifications/notification.service.js";
+
+async function classMemberRecipients(organizationId, schoolClass, { includeTeacher = true } = {}) {
+  const students = await Enrollment.find({
+    organization: organizationId,
+    class: schoolClass._id,
+    status: "active",
+  }).distinct("student");
+  return [...(includeTeacher && schoolClass.teacher ? [schoolClass.teacher] : []), ...students];
+}
 
 export async function listClassAttendance(req, res) {
   const { page, limit, classId } = req.validatedQuery;
@@ -61,7 +71,7 @@ export async function recordClassAttendance(req, res) {
     organization: req.organization._id,
     status: "active",
     ...(req.membership.role === "teacher" ? { teacher: req.membership._id } : {}),
-  }).select("_id");
+  }).select("_id name teacher");
   if (!schoolClass) throw new HttpError(404, "Assigned active class not found");
 
   const { action, ...session } = req.body;
@@ -96,6 +106,20 @@ export async function recordClassAttendance(req, res) {
     },
     { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true },
   );
+  const recipients = await classMemberRecipients(req.organization._id, schoolClass, {
+    includeTeacher: schoolClass.teacher.toString() !== req.membership._id.toString(),
+  });
+  const actionMessage = action === "rescheduled"
+    ? `Class session on ${session.sessionDate} was rescheduled to ${session.rescheduledDate} at ${session.rescheduledStartTime}.`
+    : `The class session on ${session.sessionDate} was marked ${action}.`;
+  await notifyMemberships({
+    organization: req.organization._id,
+    recipients,
+    type: "class_attendance",
+    title: `Class session · ${schoolClass.name}`,
+    message: actionMessage,
+    schoolClass,
+  });
   res.status(200).json({ success: true, data: attendance });
 }
 
@@ -206,6 +230,14 @@ export async function updateClassTimetable(req, res) {
     { new: true, runValidators: true },
   );
   if (!schoolClass) throw new HttpError(404, "Active class not found");
+  await notifyMemberships({
+    organization: req.organization._id,
+    recipients: await classMemberRecipients(req.organization._id, schoolClass),
+    type: "timetable_updated",
+    title: `Timetable updated · ${schoolClass.name}`,
+    message: `The timetable for ${schoolClass.name} has been updated.`,
+    schoolClass,
+  });
   res.json({ success: true, data: schoolClass });
 }
 
@@ -225,10 +257,30 @@ export async function requestClassTimetableChange(req, res) {
     { new: true, runValidators: true },
   );
   if (!schoolClass) throw new HttpError(404, "Assigned active class not found");
+  const administrators = await Membership.find({
+    organization: req.organization._id,
+    role: "admin",
+    status: "active",
+  }).distinct("_id");
+  await notifyMemberships({
+    organization: req.organization._id,
+    recipients: [req.membership._id, ...administrators],
+    type: "timetable_request",
+    title: `Timetable approval requested · ${schoolClass.name}`,
+    message: `A teacher requested a timetable change for ${schoolClass.name}.`,
+    schoolClass,
+  });
   res.json({ success: true, data: schoolClass });
 }
 
 export async function approveClassTimetableChange(req, res) {
+  const requestedClass = await SchoolClass.findOne({
+    _id: req.params.classId,
+    organization: req.organization._id,
+    status: "active",
+    timetableRequestedAt: { $ne: null },
+  }).select("_id name teacher timetableRequestedBy").lean();
+  if (!requestedClass) throw new HttpError(404, "No pending timetable change for this class");
   const schoolClass = await SchoolClass.findOneAndUpdate(
     {
       _id: req.params.classId,
@@ -243,10 +295,26 @@ export async function approveClassTimetableChange(req, res) {
     { new: true },
   );
   if (!schoolClass) throw new HttpError(404, "No pending timetable change for this class");
+  const recipients = await classMemberRecipients(req.organization._id, requestedClass);
+  await notifyMemberships({
+    organization: req.organization._id,
+    recipients,
+    type: "timetable_approved",
+    title: `Timetable change approved · ${schoolClass.name}`,
+    message: `The timetable change for ${schoolClass.name} was approved.`,
+    schoolClass,
+  });
   res.json({ success: true, data: schoolClass });
 }
 
 export async function rejectClassTimetableChange(req, res) {
+  const requestedClass = await SchoolClass.findOne({
+    _id: req.params.classId,
+    organization: req.organization._id,
+    status: "active",
+    timetableRequestedAt: { $ne: null },
+  }).select("_id name timetableRequestedBy").lean();
+  if (!requestedClass) throw new HttpError(404, "No pending timetable change for this class");
   const schoolClass = await SchoolClass.findOneAndUpdate(
     {
       _id: req.params.classId,
@@ -260,6 +328,14 @@ export async function rejectClassTimetableChange(req, res) {
     { new: true },
   );
   if (!schoolClass) throw new HttpError(404, "No pending timetable change for this class");
+  await notifyMemberships({
+    organization: req.organization._id,
+    recipients: [requestedClass.timetableRequestedBy],
+    type: "timetable_rejected",
+    title: `Timetable change not approved · ${schoolClass.name}`,
+    message: `The timetable change request for ${schoolClass.name} was not approved.`,
+    schoolClass,
+  });
   res.json({ success: true, data: schoolClass });
 }
 
@@ -424,13 +500,13 @@ export async function enrollStudent(req, res) {
   );
   if (!reserved) throw new HttpError(409, "Class has reached its capacity");
 
+  let enrollment;
   try {
-    const enrollment = await Enrollment.create({
+    enrollment = await Enrollment.create({
       organization: req.organization._id,
       student: student._id,
       class: schoolClass._id,
     });
-    res.status(201).json({ success: true, data: enrollment });
   } catch (error) {
     await SchoolClass.updateOne(
       { _id: schoolClass._id, organization: req.organization._id },
@@ -438,6 +514,15 @@ export async function enrollStudent(req, res) {
     );
     throw error;
   }
+  await notifyMemberships({
+    organization: req.organization._id,
+    recipients: [student._id, schoolClass.teacher],
+    type: "enrollment_added",
+    title: `Class enrollment · ${schoolClass.name}`,
+    message: `A student was enrolled in ${schoolClass.name}.`,
+    schoolClass,
+  });
+  res.status(201).json({ success: true, data: enrollment });
 }
 
 export async function withdrawStudent(req, res) {
@@ -464,5 +549,16 @@ export async function withdrawStudent(req, res) {
   if (updatedClass.modifiedCount !== 1) {
     throw new HttpError(500, "Enrollment count could not be updated");
   }
+  const schoolClass = await SchoolClass.findById(enrollment.class).select("_id name teacher");
+  const recipients = [enrollment.student, schoolClass?.teacher].filter((recipient) =>
+    recipient && recipient.toString() !== req.membership._id.toString());
+  await notifyMemberships({
+    organization: req.organization._id,
+    recipients,
+    type: "enrollment_withdrawn",
+    title: `Class enrollment ended · ${schoolClass?.name || "Class"}`,
+    message: `A student was withdrawn from ${schoolClass?.name || "the class"}.`,
+    schoolClass,
+  });
   res.json({ success: true, data: enrollment });
 }

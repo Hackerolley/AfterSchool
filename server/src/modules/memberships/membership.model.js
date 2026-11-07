@@ -16,7 +16,7 @@ const membershipSchema = new mongoose.Schema(
     mustChangePassword: {
       type: Boolean,
       default() {
-        return this.role === "student";
+        return this.role === "student" || this.role === "teacher";
       },
     },
     status: { type: String, enum: ["active", "inactive", "suspended"], default: "active" },

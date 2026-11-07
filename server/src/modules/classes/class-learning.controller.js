@@ -10,6 +10,7 @@ import { StudentProgress } from "./student-progress.model.js";
 import { getVisibleClass } from "./class.controller.js";
 import { createProgressReportPdf } from "./progress-report.pdf.js";
 import { HttpError } from "../../utils/http-error.js";
+import { notifyMemberships } from "../notifications/notification.service.js";
 
 function safeResource(resource) {
   const value = resource.toObject ? resource.toObject() : resource;
@@ -292,6 +293,14 @@ export async function updateStudentAttendance(req, res) {
       },
       upsert: true,
     },
+  })));
+  await Promise.all(req.body.records.map(({ studentMembershipId, status }) => notifyMemberships({
+    organization: req.organization._id,
+    recipients: [studentMembershipId],
+    type: "attendance_marked",
+    title: `Attendance updated · ${schoolClass.name}`,
+    message: `Your attendance for ${req.body.sessionDate} was marked ${status}.`,
+    schoolClass,
   })));
   res.json({ success: true, data: { sessionDate: req.body.sessionDate, updated: studentIds.length } });
 }

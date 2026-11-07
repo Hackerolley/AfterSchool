@@ -1,5 +1,21 @@
 import { z } from "zod";
 
+const memberIdFormatSchema = z.string()
+  .trim()
+  .min(1)
+  .max(40)
+  .refine((value) => {
+    const tokens = [...value.matchAll(/\{(DD|MM|YY|SEQ(?::[1-6])?)\}/g)];
+    const sequenceTokens = tokens.filter(([, token]) => token.startsWith("SEQ"));
+    const remainder = value.replace(/\{(DD|MM|YY|SEQ(?::[1-6])?)\}/g, "");
+    return sequenceTokens.length === 1 && /^[A-Za-z0-9_-]*$/.test(remainder);
+  }, "Use letters, numbers, hyphens, underscores, and date/sequence tokens, with exactly one sequence token");
+
+export const updateMemberIdFormatsSchema = z.object({
+  student: memberIdFormatSchema,
+  teacher: memberIdFormatSchema,
+}).strict();
+
 export const createOrganizationSchema = z.object({
   name: z.string().trim().min(1).max(120),
   slug: z.string().trim().toLowerCase().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(80),

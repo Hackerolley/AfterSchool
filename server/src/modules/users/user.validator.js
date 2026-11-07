@@ -21,6 +21,12 @@ const countryCodeSchema = z.string()
   .regex(/^[A-Za-z]{2}$/, "Use a two-letter ISO 3166-1 alpha-2 country code")
   .transform((value) => value.toUpperCase())
   .optional();
+const countryOfResidenceSchema = z.string()
+  .trim()
+  .min(1)
+  .max(80)
+  .transform((value) => (/^[A-Za-z]{2}$/.test(value) ? value.toUpperCase() : value))
+  .optional();
 
 const studentOnlyFields = [
   "studentNumber",
@@ -48,7 +54,7 @@ export const createUserSchema = z.object({
   dateOfBirth: studentDateOfBirthSchema,
   gender: z.enum(["female", "male", "non_binary", "self_described", "prefer_not_to_say"]).optional(),
   genderDescription: optionalString(80),
-  countryOfResidence: countryCodeSchema,
+  countryOfResidence: countryOfResidenceSchema,
   homeCountry: countryCodeSchema,
   phoneNumber: studentPhoneSchema,
   guardianName: optionalString(160),
@@ -103,7 +109,7 @@ export const updateStudentSchema = z.object({
   dateOfBirth: studentDateOfBirthSchema.nullable(),
   gender: z.enum(["female", "male", "non_binary", "self_described", "prefer_not_to_say"]).nullable().optional(),
   genderDescription: nullableOptionalString(80),
-  countryOfResidence: countryCodeSchema.nullable(),
+  countryOfResidence: countryOfResidenceSchema.nullable(),
   homeCountry: countryCodeSchema.nullable(),
   phoneNumber: studentPhoneSchema.nullable(),
   guardianName: nullableOptionalString(160),

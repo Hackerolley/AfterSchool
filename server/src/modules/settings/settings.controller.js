@@ -1,6 +1,7 @@
 import { deleteImage, uploadImage } from "../assignments/cloudinary.service.js";
 import { Organization } from "../organizations/organization.model.js";
 import { HttpError } from "../../utils/http-error.js";
+import { DEFAULT_MEMBER_ID_FORMATS } from "../users/user-id.js";
 
 export function getProfileSettings(req, res) {
   res.json({
@@ -47,8 +48,20 @@ export function getSchoolSettings(req, res) {
       name: req.organization.name,
       slug: req.organization.slug,
       logoUrl: req.organization.logoUrl || "",
+      idFormats: {
+        student: req.organization.idFormats?.student || DEFAULT_MEMBER_ID_FORMATS.student,
+        teacher: req.organization.idFormats?.teacher || DEFAULT_MEMBER_ID_FORMATS.teacher,
+      },
     },
   });
+}
+
+export async function updateSchoolMemberIdFormats(req, res) {
+  const organization = await Organization.findById(req.organization._id);
+  if (!organization) throw new HttpError(404, "School not found");
+  organization.idFormats = req.body;
+  await organization.save();
+  res.json({ success: true, data: { idFormats: organization.idFormats } });
 }
 
 export async function updateSchoolLogo(req, res) {

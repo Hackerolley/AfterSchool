@@ -7,9 +7,12 @@ import {
   removeProfileAvatar,
   removeSchoolLogo,
   updateProfileAvatar,
+  updateSchoolMemberIdFormats,
   updateSchoolLogo,
 } from "./settings.controller.js";
 import { uploadSettingsImage } from "./settings.upload.js";
+import { validate } from "../../middleware/validate.js";
+import { updateMemberIdFormatsSchema } from "../organizations/organization.validator.js";
 
 const router = Router();
 router.get("/profile", authenticate, asyncHandler(getProfileSettings));
@@ -17,6 +20,12 @@ router.post("/profile/avatar", authenticate, uploadSettingsImage, asyncHandler(u
 router.delete("/profile/avatar", authenticate, asyncHandler(removeProfileAvatar));
 router.use("/school", authenticate, requireOrganization);
 router.get("/school", asyncHandler(getSchoolSettings));
+router.patch(
+  "/school/id-formats",
+  authorize("admin"),
+  validate(updateMemberIdFormatsSchema),
+  asyncHandler(updateSchoolMemberIdFormats),
+);
 router.post("/school/logo", authorize("admin"), uploadSettingsImage, asyncHandler(updateSchoolLogo));
 router.delete("/school/logo", authorize("admin"), asyncHandler(removeSchoolLogo));
 

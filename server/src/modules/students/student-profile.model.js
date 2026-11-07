@@ -26,8 +26,8 @@ const studentProfileSchema = new mongoose.Schema(
     genderDescription: { type: String, trim: true, maxlength: 80 },
     countryOfResidence: {
       type: String,
-      uppercase: true,
-      match: /^[A-Z]{2}$/,
+      trim: true,
+      maxlength: 80,
     },
     homeCountry: {
       type: String,
