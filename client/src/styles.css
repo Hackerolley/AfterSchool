@@ -2085,6 +2085,7 @@ body {
 
 .modal-backdrop {
   z-index: 80;
+  grid-template-columns: minmax(0, 1fr);
   min-height: 100vh;
   min-height: 100dvh;
   padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
@@ -2101,6 +2102,7 @@ body {
 .action-dialog {
   display: flex;
   width: min(100%, 720px);
+  max-width: 100%;
   min-width: 0;
   flex-direction: column;
   overflow: hidden;
