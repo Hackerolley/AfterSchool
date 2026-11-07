@@ -1234,27 +1234,6 @@ html[data-theme="dark"] .input-wrap { border-color: #484158; color: #eeeaf6; bac
 html[data-theme="dark"] input::placeholder,
 html[data-theme="dark"] textarea::placeholder { color: #928ba4; }
 html[data-theme="dark"] .modal { border-color: #49425a; color: #eeeaf6; background: rgba(37, 33, 53, .97); }
-html[data-theme="dark"] .action-dialog-student-edit,
-html[data-theme="dark"] .action-dialog-teacher-edit {
-  color-scheme: light;
-  border-color: #e7ece7;
-  color: #263a30;
-  background: #fff;
-}
-html[data-theme="dark"] .action-dialog-student-edit h2,
-html[data-theme="dark"] .action-dialog-teacher-edit h2 { color: #2a3e32; }
-html[data-theme="dark"] .action-dialog-student-edit .form-field > span,
-html[data-theme="dark"] .action-dialog-teacher-edit .form-field > span { color: #35453d; }
-html[data-theme="dark"] .action-dialog-student-edit input,
-html[data-theme="dark"] .action-dialog-student-edit select,
-html[data-theme="dark"] .action-dialog-student-edit textarea,
-html[data-theme="dark"] .action-dialog-teacher-edit input,
-html[data-theme="dark"] .action-dialog-teacher-edit select,
-html[data-theme="dark"] .action-dialog-teacher-edit textarea {
-  border-color: #e2e8e1;
-  color: #3f5146;
-  background-color: #fff;
-}
 html[data-theme="dark"] .modal h2,
 html[data-theme="dark"] .settings-heading h2,
 html[data-theme="dark"] .settings-identity strong { color: #f0edf8; }
@@ -2092,4 +2071,110 @@ html[data-theme="dark"] .class-learning-success { color: #9cddb6; }
   .class-student-progress-actions { flex-wrap: wrap; }
   .class-progress-toolbar { align-items: flex-start; flex-direction: column; }
   .class-progress-toolbar .field { width: 100%; }
+}
+
+html,
+body,
+#root { min-height: 100%; }
+body {
+  min-height: 100svh;
+  min-height: 100dvh;
+  overflow-x: clip;
+  -webkit-text-size-adjust: 100%;
+}
+
+.modal-backdrop {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  overscroll-behavior: contain;
+}
+.modal {
+  width: min(100%, 600px);
+  max-height: min(90vh, 900px);
+  max-height: min(90dvh, 900px);
+  padding: clamp(18px, 3vw, 28px);
+  border-radius: 20px;
+  box-shadow: 0 28px 90px rgba(13, 30, 48, .22), 0 4px 14px rgba(13, 30, 48, .08);
+}
+.action-dialog {
+  display: flex;
+  width: min(100%, 720px);
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--paper);
+}
+.action-dialog .modal-heading {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  flex: 0 0 auto;
+  margin: calc(clamp(18px, 3vw, 28px) * -1) calc(clamp(18px, 3vw, 28px) * -1) 0;
+  padding: clamp(18px, 3vw, 28px);
+  background: var(--paper);
+}
+.action-dialog .modal-form {
+  gap: 17px;
+  min-height: 0;
+  padding: 20px 2px 2px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.action-dialog .form-two { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.action-dialog .form-field { gap: 7px; }
+.action-dialog .form-field > span { color: var(--ink); font-size: 12px; font-weight: 650; }
+.action-dialog .form-field input,
+.action-dialog .form-field select,
+.action-dialog .form-field textarea {
+  min-height: 48px;
+  padding: 11px 13px;
+  border-color: var(--line);
+  border-radius: 12px;
+  color: var(--ink);
+  background: var(--paper);
+  font-size: 14px;
+  transition: border-color .16s ease, box-shadow .16s ease, background-color .16s ease;
+}
+.action-dialog .form-field input:hover,
+.action-dialog .form-field select:hover,
+.action-dialog .form-field textarea:hover { border-color: #9eb4c9; }
+.action-dialog .form-field input:focus,
+.action-dialog .form-field select:focus,
+.action-dialog .form-field textarea:focus {
+  border-color: #4f91d4;
+  outline: 0;
+  box-shadow: 0 0 0 4px rgba(48, 126, 202, .13);
+}
+.action-dialog .form-field input:disabled { opacity: .6; cursor: not-allowed; }
+.action-dialog .form-section-title { color: var(--muted); font-size: 10px; }
+.action-dialog .modal-actions {
+  position: sticky;
+  z-index: 2;
+  bottom: 0;
+  flex: 0 0 auto;
+  margin: 0 -2px calc(clamp(18px, 3vw, 28px) * -1);
+  padding: 14px 2px clamp(18px, 3vw, 28px);
+  border-color: var(--line);
+  background: var(--paper);
+}
+.action-dialog .modal-actions .button { min-height: 44px; padding-inline: 16px; border-radius: 11px; }
+.modal-heading h2 { font-size: clamp(21px, 3vw, 26px); }
+
+@media (max-width: 650px) {
+  .modal-backdrop { place-items: center; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+  .modal,
+  .action-dialog { width: 100%; max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 16px); padding: 18px; border-radius: 18px; }
+  .action-dialog .modal-heading { margin: -18px -18px 0; padding: 18px; }
+  .action-dialog .modal-form { gap: 15px; padding-top: 16px; }
+  .action-dialog .form-two { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .action-dialog .form-field input,
+  .action-dialog .form-field select,
+  .action-dialog .form-field textarea,
+  .form-field input,
+  .form-field select,
+  .form-field textarea,
+  .field input,
+  .field select,
+  .field textarea { min-height: 48px; font-size: 16px; }
+  .action-dialog .modal-actions { margin: 0 -2px -18px; padding: 12px 2px 18px; }
 }

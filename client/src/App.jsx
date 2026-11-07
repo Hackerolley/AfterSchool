@@ -767,7 +767,7 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
         </div>
       </main>
 
-      {dialog && <ActionDialog type={dialog} initialItem={dialogItem} initialClassId={dialogClassId} courses={data.courses.filter((item) => item.status === "active")} teachers={data.teachers} students={data.students} classes={data.classes} onClose={() => { setDialog(""); setDialogItem(null); }} onSubmit={submitCreate} />}
+      {dialog && <ActionDialog key={`${dialog}-${dialogItem?._id || "new"}`} type={dialog} initialItem={dialogItem} initialClassId={dialogClassId} courses={data.courses.filter((item) => item.status === "active")} teachers={data.teachers} students={data.students} classes={data.classes} onClose={() => { setDialog(""); setDialogItem(null); }} onSubmit={submitCreate} />}
       {passwordResetPerson && <PasswordResetDialog
         item={passwordResetPerson}
         organizationId={orgId}
@@ -1671,6 +1671,9 @@ function ActionDialog({ type, initialItem = null, initialClassId = "", courses =
     return current?.length ? current.map((slot) => ({ ...slot })) : [{ dayOfWeek: 1, startTime: "09:00", endTime: "10:00", googleMeetLink: "" }];
   });
   const [gender, setGender] = useState(() => initialItem?.profile?.gender || "");
+  const qualifications = Array.isArray(initialItem?.profile?.qualifications)
+    ? initialItem.profile.qualifications.join(", ")
+    : "";
 
   useEffect(() => {
     const closeOnEscape = (event) => {
@@ -1778,7 +1781,7 @@ function ActionDialog({ type, initialItem = null, initialClassId = "", courses =
               <FormField label="Guardian name"><input name="guardianName" defaultValue={initialItem?.profile?.guardianName || ""} /></FormField>
               <div className="form-two"><FormField label="Guardian email"><input type="email" name="guardianEmail" defaultValue={initialItem?.profile?.guardianEmail || ""} /></FormField><FormField label="Guardian phone"><input type="tel" name="guardianPhone" defaultValue={initialItem?.profile?.guardianPhone || ""} /></FormField></div>
             </>}
-            {personType === "teacher" && <><div className="form-section-title">TEACHER DETAILS <span>OPTIONAL</span></div><div className="form-two">{editingPerson ? <FormField label="Teacher ID"><input name="employeeId" defaultValue={initialItem?.profile?.employeeId || ""} /></FormField> : <p className="generated-id-note">Teacher ID is generated automatically using your school’s ID format.</p>}<FormField label="Specialization"><input name="specialization" defaultValue={initialItem?.profile?.specialization || ""} /></FormField></div><FormField label="Qualifications"><input name="qualifications" placeholder="Separate qualifications with commas" defaultValue={initialItem?.profile?.qualifications?.join(", ") || ""} /></FormField></>}
+            {personType === "teacher" && <><div className="form-section-title">TEACHER DETAILS <span>OPTIONAL</span></div><div className="form-two">{editingPerson ? <FormField label="Teacher ID"><input name="employeeId" defaultValue={initialItem?.profile?.employeeId || ""} /></FormField> : <p className="generated-id-note">Teacher ID is generated automatically using your school’s ID format.</p>}<FormField label="Specialization"><input name="specialization" defaultValue={initialItem?.profile?.specialization || ""} /></FormField></div><FormField label="Qualifications"><input name="qualifications" placeholder="Separate qualifications with commas" defaultValue={qualifications} /></FormField></>}
           </>}
           {(type === "course" || type === "course-edit") && <><FormField label="Course name"><input autoFocus required name="name" maxLength="120" placeholder="e.g. English language" defaultValue={initialItem?.name || ""} /></FormField><FormField label="Course code"><input required name="code" maxLength="32" placeholder="e.g. ENG-101" defaultValue={initialItem?.code || ""} /></FormField><FormField label="Description"><textarea name="description" rows="3" maxLength="2000" placeholder="What will students explore in this course?" defaultValue={initialItem?.description || ""} /></FormField></>}
           {(type === "class" || type === "class-edit") && <><FormField label="Class name"><input autoFocus required name="name" maxLength="120" placeholder="e.g. Year 8 · Blue group" defaultValue={initialItem?.name || ""} /></FormField><FormField label="Course"><select required name="courseId" defaultValue={initialItem?.course?._id || ""}><option value="" disabled>Choose a course</option>{courses.map((item) => <option key={item._id} value={item._id}>{item.name} · {item.code}</option>)}</select>{courses.length === 0 && <small>Create a course first to use it in a class.</small>}</FormField><FormField label="Assigned teacher"><select required name="teacherMembershipId" defaultValue={initialItem?.teacher?._id || ""}><option value="" disabled>Choose a teacher</option>{teachers.map((item) => <option key={item._id} value={item._id}>{fullName(item.user)}</option>)}</select>{teachers.length === 0 && <small>Add a teacher first to assign one to this class.</small>}</FormField><FormField label="Class capacity"><input type="number" required name="capacity" min="1" max="1000" defaultValue={initialItem?.capacity || 30} /></FormField></>}
