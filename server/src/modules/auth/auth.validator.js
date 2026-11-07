@@ -16,5 +16,5 @@ export const platformAdminLoginSchema = z.object({
 }).strict();
 
 export const changePasswordSchema = z.object({
-  newPassword: z.string().min(12).max(128),
+  newPassword: z.string().min(6).max(128),
 }).strict();

@@ -23,7 +23,7 @@ export const createOrganizationSchema = z.object({
     firstName: z.string().trim().min(1).max(80),
     lastName: z.string().trim().min(1).max(80),
     email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
-    password: z.string().min(12).max(128),
+    password: z.string().min(6).max(128),
   }).strict(),
 }).strict();
 

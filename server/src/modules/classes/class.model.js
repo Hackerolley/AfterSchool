@@ -5,7 +5,8 @@ const timetableEntrySchema = new mongoose.Schema(
     dayOfWeek: { type: Number, min: 0, max: 6, required: true },
     startTime: { type: String, required: true, match: /^([01]\d|2[0-3]):[0-5]\d$/ },
     endTime: { type: String, required: true, match: /^([01]\d|2[0-3]):[0-5]\d$/ },
-    googleMeetLink: { type: String, required: true, maxlength: 2048 },
+    googleMeetLink: { type: String, default: "", maxlength: 2048 },
+    zoomLink: { type: String, default: "", maxlength: 2048 },
   },
   { _id: false, strict: "throw" },
 );

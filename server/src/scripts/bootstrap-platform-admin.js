@@ -15,8 +15,8 @@ if (!firstName || !lastName || !email || !password) {
 if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
   throw new Error("PLATFORM_ADMIN_EMAIL must be a valid email address");
 }
-if (password.length < 12 || password.length > 128) {
-  throw new Error("PLATFORM_ADMIN_PASSWORD must be between 12 and 128 characters");
+if (password.length < 6 || password.length > 128) {
+  throw new Error("PLATFORM_ADMIN_PASSWORD must be between 6 and 128 characters");
 }
 
 try {

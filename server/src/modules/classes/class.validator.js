@@ -1,24 +1,45 @@
 import { z } from "zod";
 
+const googleMeetLinkSchema = z.string().max(2048).default("").refine((value) => {
+  if (!value) return true;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:"
+      && url.hostname === "meet.google.com"
+      && url.pathname.length > 1
+      && !url.username
+      && !url.password;
+  } catch {
+    return false;
+  }
+}, "Google Meet links must use https://meet.google.com");
+
+const zoomLinkSchema = z.string().max(2048).default("").refine((value) => {
+  if (!value) return true;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:"
+      && (url.hostname === "zoom.us" || url.hostname.endsWith(".zoom.us"))
+      && url.pathname.length > 1
+      && !url.username
+      && !url.password;
+  } catch {
+    return false;
+  }
+}, "Zoom links must use an https://zoom.us address");
+
 const timetableEntrySchema = z.object({
   dayOfWeek: z.number().int().min(0).max(6),
   startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   endTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
-  googleMeetLink: z.string().url().max(2048).refine((value) => {
-    try {
-      const url = new URL(value);
-      return url.protocol === "https:"
-        && url.hostname === "meet.google.com"
-        && url.pathname.length > 1
-        && !url.username
-        && !url.password;
-    } catch {
-      return false;
-    }
-  }, "Google Meet links must use https://meet.google.com"),
+  googleMeetLink: googleMeetLinkSchema,
+  zoomLink: zoomLinkSchema,
 }).strict().refine((entry) => entry.endTime > entry.startTime, {
   message: "Class end time must be after the start time",
   path: ["endTime"],
+}).refine((entry) => entry.googleMeetLink || entry.zoomLink, {
+  message: "Provide a Google Meet or Zoom link",
+  path: ["googleMeetLink"],
 });
 
 const sessionDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {

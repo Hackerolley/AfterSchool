@@ -378,7 +378,7 @@ test("notifications support school updates and auto-expire three days after bein
   assert.deepEqual(readExpiryIndex[1].partialFilterExpression, { readAt: { $exists: true } });
 });
 
-test("class timetables accept weekly Google Meet sessions and reject unsafe or invalid entries", () => {
+test("class timetables accept Google Meet and Zoom links and reject unsafe or invalid entries", () => {
   const session = {
     dayOfWeek: 1,
     startTime: "09:00",
@@ -386,6 +386,17 @@ test("class timetables accept weekly Google Meet sessions and reject unsafe or i
     googleMeetLink: "https://meet.google.com/abc-defg-hij",
   };
   assert.equal(updateClassTimetableSchema.safeParse({ timetable: [session] }).success, true);
+  assert.equal(updateClassTimetableSchema.safeParse({
+    timetable: [{ ...session, zoomLink: "https://us02web.zoom.us/j/123456789" }],
+  }).success, true);
+  assert.equal(updateClassTimetableSchema.safeParse({
+    timetable: [{
+      dayOfWeek: 1,
+      startTime: "09:00",
+      endTime: "10:00",
+      zoomLink: "https://zoom.us/j/123456789",
+    }],
+  }).success, true);
   assert.equal(updateClassTimetableSchema.safeParse({ timetable: [] }).success, true);
   assert.equal(updateClassTimetableSchema.safeParse({
     timetable: [{ ...session, googleMeetLink: "https://example.com/meeting" }],
@@ -398,6 +409,12 @@ test("class timetables accept weekly Google Meet sessions and reject unsafe or i
   }).success, false);
   assert.equal(updateClassTimetableSchema.safeParse({
     timetable: [{ ...session, googleMeetLink: "https://user:pass@meet.google.com/abc-defg-hij" }],
+  }).success, false);
+  assert.equal(updateClassTimetableSchema.safeParse({
+    timetable: [{ ...session, zoomLink: "https://example.com/meeting" }],
+  }).success, false);
+  assert.equal(updateClassTimetableSchema.safeParse({
+    timetable: [{ dayOfWeek: 1, startTime: "09:00", endTime: "10:00" }],
   }).success, false);
   assert.equal(updateClassTimetableSchema.safeParse({
     timetable: [{ ...session, startTime: "10:00", endTime: "09:00" }],
@@ -603,6 +620,7 @@ test("new student and teacher accounts require a password change and password up
   assert.equal(new Membership({ role: "teacher" }).mustChangePassword, true);
   assert.equal(new Membership({ role: "admin" }).mustChangePassword, false);
   assert.equal(changePasswordSchema.safeParse({ newPassword: "a-secure-new-password" }).success, true);
+  assert.equal(changePasswordSchema.safeParse({ newPassword: "123456" }).success, true);
   assert.equal(changePasswordSchema.safeParse({ newPassword: "short" }).success, false);
   assert.equal(changePasswordSchema.safeParse({ newPassword: "a-secure-new-password", extra: true }).success, false);
 });
@@ -688,6 +706,20 @@ test("user creation cannot assign the administrator role", () => {
     role: "admin",
   });
   assert.equal(result.success, false);
+  assert.equal(createUserSchema.safeParse({
+    firstName: "Ada",
+    lastName: "Example",
+    email: "ada@example.com",
+    password: "123456",
+    role: "student",
+  }).success, true);
+  assert.equal(createUserSchema.safeParse({
+    firstName: "Ada",
+    lastName: "Example",
+    email: "ada@example.com",
+    password: "12345",
+    role: "student",
+  }).success, false);
 });
 
 test("student profile fields are accepted and country codes are normalized", () => {
@@ -803,8 +835,9 @@ test("student and teacher profile updates accept only their own editable fields"
   assert.equal(updateTeacherSchema.safeParse({}).success, false);
 });
 
-test("admin password resets require a strong replacement password and reject extra fields", () => {
+test("admin password resets require six characters and reject extra fields", () => {
   assert.equal(resetUserPasswordSchema.safeParse({ newPassword: "a-secure-new-password" }).success, true);
+  assert.equal(resetUserPasswordSchema.safeParse({ newPassword: "123456" }).success, true);
   assert.equal(resetUserPasswordSchema.safeParse({ newPassword: "short" }).success, false);
   assert.equal(
     resetUserPasswordSchema.safeParse({ newPassword: "a-secure-new-password", mustChangePassword: false }).success,
@@ -838,7 +871,7 @@ test("platform organization creation requires an initial school admin and reject
       firstName: "School",
       lastName: "Admin",
       email: "admin@example.com",
-      password: "unique-long-password",
+      password: "123456",
     },
   });
   assert.equal(valid.success, true);

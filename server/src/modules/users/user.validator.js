@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const passwordSchema = z.string().min(12).max(128);
+const passwordSchema = z.string().min(6).max(128);
 const optionalString = (max) => z.string().trim().max(max).optional();
 const nullableOptionalString = (max) => z.string().trim().max(max).nullable().optional();
 const studentPhoneSchema = z.string()

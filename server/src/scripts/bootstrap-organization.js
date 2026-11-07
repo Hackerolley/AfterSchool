@@ -16,8 +16,8 @@ if (!name || !slug || !firstName || !lastName || !email || !password) {
     "Set BOOTSTRAP_ORG_NAME, BOOTSTRAP_ORG_SLUG, BOOTSTRAP_ADMIN_FIRST_NAME, BOOTSTRAP_ADMIN_LAST_NAME, BOOTSTRAP_ADMIN_EMAIL, and BOOTSTRAP_ADMIN_PASSWORD",
   );
 }
-if (password.length < 12 || password.length > 128) {
-  throw new Error("BOOTSTRAP_ADMIN_PASSWORD must be between 12 and 128 characters");
+if (password.length < 6 || password.length > 128) {
+  throw new Error("BOOTSTRAP_ADMIN_PASSWORD must be between 6 and 128 characters");
 }
 
 let organization;

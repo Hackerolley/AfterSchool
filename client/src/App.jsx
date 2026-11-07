@@ -888,7 +888,7 @@ function TimetablePage({ role, classes, attendance, loading, onConfigure, onRevi
               </div>
               {schoolClass.pendingTimetable?.length ? (
                 <ul className="timetable-request-preview">
-                  {schoolClass.pendingTimetable.map((slot, index) => <li key={`${slot.dayOfWeek}-${slot.startTime}-${index}`}>{weekDays[slot.dayOfWeek]} · {slot.startTime}–{slot.endTime} · <a href={slot.googleMeetLink} target="_blank" rel="noopener noreferrer">Google Meet link</a></li>)}
+                  {schoolClass.pendingTimetable.map((slot, index) => <li key={`${slot.dayOfWeek}-${slot.startTime}-${index}`}>{weekDays[slot.dayOfWeek]} · {slot.startTime}–{slot.endTime}{slot.googleMeetLink && <> · <a href={slot.googleMeetLink} target="_blank" rel="noopener noreferrer">Google Meet</a></>}{slot.zoomLink && <> · <a href={slot.zoomLink} target="_blank" rel="noopener noreferrer">Zoom</a></>}</li>)}
                 </ul>
               ) : <p className="timetable-request-empty">This request removes all scheduled sessions.</p>}
               <div className="timetable-request-actions">
@@ -911,7 +911,7 @@ function TimetablePage({ role, classes, attendance, loading, onConfigure, onRevi
         <EmptyState
           icon={CalendarDays}
           title="No classes scheduled yet"
-          text={role === "admin" ? "Set a weekly day, time, and Google Meet link for a class to publish it here." : "Your teacher or school admin will add your class times here."}
+          text={role === "admin" ? "Set a weekly day, time, and Google Meet or Zoom link for a class to publish it here." : "Your teacher or school admin will add your class times here."}
           action={role === "admin" ? <button className="button button-primary button-small" onClick={onConfigure}><Plus size={15} />Set up timetable</button> : null}
         />
       ) : (
@@ -921,7 +921,7 @@ function TimetablePage({ role, classes, attendance, loading, onConfigure, onRevi
               <tr><th scope="col">Date</th><th scope="col">Class time</th><th scope="col">Class</th><th scope="col">Attendance</th><th scope="col">Meeting</th><th scope="col">Actions</th></tr>
             </thead>
             <tbody>
-              {entries.map(({ schoolClass, dayOfWeek, startTime, endTime, googleMeetLink }, index) => (
+              {entries.map(({ schoolClass, dayOfWeek, startTime, endTime, googleMeetLink, zoomLink }, index) => (
                 <TimetableSessionRow
                   key={`${schoolClass._id}-${dayOfWeek}-${startTime}-${index}`}
                   role={role}
@@ -930,6 +930,7 @@ function TimetablePage({ role, classes, attendance, loading, onConfigure, onRevi
                   startTime={startTime}
                   endTime={endTime}
                   googleMeetLink={googleMeetLink}
+                  zoomLink={zoomLink}
                   now={now}
                   attendance={attendanceByOccurrence}
                   onRecordAttendance={onRecordAttendance}
@@ -998,6 +999,7 @@ function TimetableSessionRow({
   startTime,
   endTime,
   googleMeetLink,
+  zoomLink,
   now,
   attendance,
   onRecordAttendance,
@@ -1022,11 +1024,16 @@ function TimetableSessionRow({
           : <ClassCountdown dayOfWeek={dayOfWeek} startTime={startTime} endTime={endTime} />}
         {record?.status === "rescheduled" && record.rescheduledDate && <span className="attendance-rescheduled-to">Moved to {record.rescheduledDate} · {record.rescheduledStartTime}</span>}
       </td>
-      <td>{googleMeetLink ? (
-        <a className="button button-primary timetable-join" href={googleMeetLink} target="_blank" rel="noopener noreferrer">
-          <Video size={16} />Join class
-        </a>
-      ) : <span className="timetable-pending">Meet link not added</span>}</td>
+      <td>{googleMeetLink || zoomLink ? (
+        <div className="timetable-meeting-links">
+          {googleMeetLink && <a className="button button-primary timetable-join" href={googleMeetLink} target="_blank" rel="noopener noreferrer" aria-label={`Join ${schoolClass.name} on Google Meet`}>
+            <Video size={16} />Google Meet
+          </a>}
+          {zoomLink && <a className="button button-quiet timetable-join" href={zoomLink} target="_blank" rel="noopener noreferrer" aria-label={`Join ${schoolClass.name} on Zoom`}>
+            <Video size={16} />Zoom
+          </a>}
+        </div>
+      ) : <span className="timetable-pending">Meeting link not added</span>}</td>
       <td>
         {(role === "admin" || role === "teacher") && (
           <div className="attendance-actions">
@@ -1562,11 +1569,11 @@ function PasswordChangeDialog({ organizationId, onComplete }) {
         </div>
         <form className="modal-form" onSubmit={submit}>
           <FormField label="New password">
-            <input autoFocus required minLength="12" maxLength="128" type="password" name="newPassword" autoComplete="new-password" />
-            <small>Use at least 12 characters.</small>
+            <input autoFocus required minLength="6" maxLength="128" type="password" name="newPassword" autoComplete="new-password" />
+            <small>Use at least 6 characters.</small>
           </FormField>
           <FormField label="Confirm new password">
-            <input required minLength="12" maxLength="128" type="password" name="confirmPassword" autoComplete="new-password" />
+            <input required minLength="6" maxLength="128" type="password" name="confirmPassword" autoComplete="new-password" />
           </FormField>
           {error && <div className="form-error" role="alert">{error}</div>}
           <div className="modal-actions">
@@ -1619,11 +1626,11 @@ function PasswordResetDialog({ item, organizationId, onClose, onComplete }) {
         </div>
         <form className="modal-form" onSubmit={submit}>
           <FormField label="Temporary password">
-            <input autoFocus required minLength="12" maxLength="128" type="password" name="newPassword" autoComplete="new-password" />
-            <small>Use at least 12 characters. Existing passwords cannot be viewed or recovered.</small>
+            <input autoFocus required minLength="6" maxLength="128" type="password" name="newPassword" autoComplete="new-password" />
+            <small>Use at least 6 characters. Existing passwords cannot be viewed or recovered.</small>
           </FormField>
           <FormField label="Confirm temporary password">
-            <input required minLength="12" maxLength="128" type="password" name="confirmPassword" autoComplete="new-password" />
+            <input required minLength="6" maxLength="128" type="password" name="confirmPassword" autoComplete="new-password" />
           </FormField>
           {error && <div className="form-error" role="alert">{error}</div>}
           <div className="modal-actions">
@@ -1648,7 +1655,7 @@ function ActionDialog({ type, initialItem = null, initialClassId = "", courses =
     "course-edit": { title: "Edit course", subtitle: "Update the course details for your school.", button: "Save course" },
     class: { title: "Create a class", subtitle: "Choose a course, teacher, and class size.", button: "Create class" },
     "class-edit": { title: "Edit class", subtitle: "Update the class name, course, teacher, or capacity.", button: "Save class" },
-    timetable: { title: "Edit class timetable", subtitle: "Update the published weekly times and Google Meet links.", button: "Save timetable" },
+    timetable: { title: "Edit class timetable", subtitle: "Update the published weekly times and Google Meet or Zoom links.", button: "Save timetable" },
     "timetable-request": { title: "Request a timetable change", subtitle: "Your proposal will be sent to the school admin for approval.", button: "Send for approval" },
     enroll: { title: "Enroll a student", subtitle: "Add a student to one of your classes.", button: "Enroll student" },
     organization: { title: "Create a school", subtitle: "Set up a workspace and its first administrator.", button: "Create school" },
@@ -1668,7 +1675,7 @@ function ActionDialog({ type, initialItem = null, initialClassId = "", courses =
     if (type === "timetable-request" && startingClass?.timetableRequestedAt && current) {
       return current.map((slot) => ({ ...slot }));
     }
-    return current?.length ? current.map((slot) => ({ ...slot })) : [{ dayOfWeek: 1, startTime: "09:00", endTime: "10:00", googleMeetLink: "" }];
+    return current?.length ? current.map((slot) => ({ ...slot, googleMeetLink: slot.googleMeetLink || "", zoomLink: slot.zoomLink || "" })) : [{ dayOfWeek: 1, startTime: "09:00", endTime: "10:00", googleMeetLink: "", zoomLink: "" }];
   });
   const [gender, setGender] = useState(() => initialItem?.profile?.gender || "");
   const qualifications = Array.isArray(initialItem?.profile?.qualifications)
@@ -1686,6 +1693,10 @@ function ActionDialog({ type, initialItem = null, initialClassId = "", courses =
   async function submit(event) {
     event.preventDefault();
     setFormError("");
+    if ((type === "timetable" || type === "timetable-request") && timetable.some((slot) => !slot.googleMeetLink.trim() && !slot.zoomLink.trim())) {
+      setFormError("Add a Google Meet or Zoom link for each session.");
+      return;
+    }
     setPending(true);
     const formData = new FormData(event.currentTarget);
     const value = (key) => String(formData.get(key) || "").trim();
@@ -1731,6 +1742,7 @@ function ActionDialog({ type, initialItem = null, initialClassId = "", courses =
         startTime: slot.startTime,
         endTime: slot.endTime,
         googleMeetLink: slot.googleMeetLink.trim(),
+        zoomLink: slot.zoomLink.trim(),
       }));
     } else {
       body.name = value("name");
@@ -1799,10 +1811,10 @@ function ActionDialog({ type, initialItem = null, initialClassId = "", courses =
                     ? selected.pendingTimetable
                     : selected?.timetable;
                   setTimetable(type === "timetable-request" && selected?.timetableRequestedAt && current
-                    ? current.map((slot) => ({ ...slot }))
+                    ? current.map((slot) => ({ ...slot, googleMeetLink: slot.googleMeetLink || "", zoomLink: slot.zoomLink || "" }))
                     : current?.length
-                      ? current.map((slot) => ({ ...slot }))
-                      : [{ dayOfWeek: 1, startTime: "09:00", endTime: "10:00", googleMeetLink: "" }]);
+                      ? current.map((slot) => ({ ...slot, googleMeetLink: slot.googleMeetLink || "", zoomLink: slot.zoomLink || "" }))
+                    : [{ dayOfWeek: 1, startTime: "09:00", endTime: "10:00", googleMeetLink: "", zoomLink: "" }]);
                 }}
               >
                 <option value="" disabled>Choose a class</option>
@@ -1831,14 +1843,18 @@ function ActionDialog({ type, initialItem = null, initialClassId = "", courses =
                   </FormField>
                 </div>
                 <FormField label="Google Meet link">
-                  <input required type="url" placeholder="https://meet.google.com/…" value={slot.googleMeetLink} onChange={(event) => setTimetable((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, googleMeetLink: event.target.value } : item))} />
+                  <input type="url" placeholder="https://meet.google.com/…" value={slot.googleMeetLink || ""} onChange={(event) => setTimetable((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, googleMeetLink: event.target.value } : item))} />
+                </FormField>
+                <FormField label="Zoom link">
+                  <input type="url" placeholder="https://zoom.us/j/…" value={slot.zoomLink || ""} onChange={(event) => setTimetable((items) => items.map((item, itemIndex) => itemIndex === index ? { ...item, zoomLink: event.target.value } : item))} />
+                  <small>Add at least one meeting link. You can provide both.</small>
                 </FormField>
                 <button className="text-button timetable-remove" type="button" onClick={() => setTimetable((items) => items.filter((_, itemIndex) => itemIndex !== index))}>Remove session</button>
               </div>
             ))}
-            <button className="text-button timetable-add" type="button" disabled={timetable.length >= 14} onClick={() => setTimetable((items) => [...items, { dayOfWeek: 1, startTime: "09:00", endTime: "10:00", googleMeetLink: "" }])}><Plus size={15} />Add another weekly session</button>
+            <button className="text-button timetable-add" type="button" disabled={timetable.length >= 14} onClick={() => setTimetable((items) => [...items, { dayOfWeek: 1, startTime: "09:00", endTime: "10:00", googleMeetLink: "", zoomLink: "" }])}><Plus size={15} />Add another weekly session</button>
           </>}
-          {type === "organization" && <><div className="form-two"><FormField label="School name"><input autoFocus required name="name" maxLength="120" placeholder="e.g. Northfield Academy" /></FormField><FormField label="School slug"><input required name="slug" maxLength="80" pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="northfield-academy" /><small>Used when school members sign in.</small></FormField></div><div className="form-section-title">FIRST SCHOOL ADMIN</div><div className="form-two"><FormField label="First name"><input required name="adminFirstName" /></FormField><FormField label="Last name"><input required name="adminLastName" /></FormField></div><FormField label="Admin email"><input required type="email" name="adminEmail" /></FormField><FormField label="Temporary password"><input required minLength="12" maxLength="128" type="password" name="adminPassword" autoComplete="new-password" /><small>At least 12 characters. Share it securely with the administrator.</small></FormField></>}
+          {type === "organization" && <><div className="form-two"><FormField label="School name"><input autoFocus required name="name" maxLength="120" placeholder="e.g. Northfield Academy" /></FormField><FormField label="School slug"><input required name="slug" maxLength="80" pattern="[a-z0-9]+(-[a-z0-9]+)*" placeholder="northfield-academy" /><small>Used when school members sign in.</small></FormField></div><div className="form-section-title">FIRST SCHOOL ADMIN</div><div className="form-two"><FormField label="First name"><input required name="adminFirstName" /></FormField><FormField label="Last name"><input required name="adminLastName" /></FormField></div><FormField label="Admin email"><input required type="email" name="adminEmail" /></FormField><FormField label="Temporary password"><input required minLength="6" maxLength="128" type="password" name="adminPassword" autoComplete="new-password" /><small>At least 6 characters. Share it securely with the administrator.</small></FormField></>}
           {formError && <div className="form-error" role="alert">{formError}</div>}
           <div className="modal-actions"><button className="button button-quiet" type="button" disabled={pending} onClick={onClose}>Cancel</button><button className="button button-primary" type="submit" disabled={pending || ((type === "class" || type === "class-edit") && (!courses.length || !teachers.length)) || (type === "enroll" && (!classes.length || !students.length)) || ((type === "timetable" || type === "timetable-request") && !classes.length)}>{pending ? <><span className="spinner" />{type === "student" ? "Adding student…" : type === "teacher" ? "Adding teacher…" : type === "course" ? "Creating course…" : type === "class" ? "Creating class…" : "Saving…"}</> : <>{config.button}<ArrowRight size={16} /></>}</button></div>
         </form>
