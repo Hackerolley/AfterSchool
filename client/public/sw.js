@@ -1,12 +1,12 @@
-const CACHE_NAME = "afterschool-shell-v1";
+const CACHE_NAME = "afterschool-shell-v2";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
-  "/icons/afterschool.svg",
-  "/icons/apple-touch-icon.png",
-  "/icons/icon-192.png",
-  "/icons/icon-512.png",
-  "/icons/icon-maskable-512.png",
+  "/icons/afterschool.svg?v=2",
+  "/icons/apple-touch-icon.png?v=2",
+  "/icons/icon-192.png?v=2",
+  "/icons/icon-512.png?v=2",
+  "/icons/icon-maskable-512.png?v=2",
 ];
 
 self.addEventListener("install", (event) => {

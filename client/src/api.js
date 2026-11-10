@@ -1,4 +1,6 @@
-const API_URL = (import.meta.env.VITE_API_URL || "/api/v1").replace(/\/$/, "");
+const API_URL = (import.meta.env.PROD
+  ? "/api/v1"
+  : import.meta.env.VITE_API_URL || "/api/v1").replace(/\/$/, "");
 const CSRF_KEY = "afterschool.csrf";
 let csrfTokenRequest;
 

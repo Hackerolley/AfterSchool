@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/v1/:path*",
+      "destination": "https://afterschool-k7up.onrender.com/api/v1/:path*"
+    }
+  ]
+}
