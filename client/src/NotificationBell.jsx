@@ -23,8 +23,17 @@ export default function NotificationBell({ organizationId, onOpenAssignment }) {
 
   useEffect(() => {
     void refresh();
-    const interval = window.setInterval(() => void refresh(), 45_000);
-    return () => window.clearInterval(interval);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void refresh();
+    };
+    const interval = window.setInterval(refreshWhenVisible, 45_000);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("pageshow", refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("pageshow", refreshWhenVisible);
+    };
   }, [organizationId]);
 
   async function selectNotification(notification) {

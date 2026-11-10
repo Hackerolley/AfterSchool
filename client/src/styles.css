@@ -2189,3 +2189,61 @@ body {
   .field textarea { min-height: 48px; font-size: 16px; }
   .action-dialog .modal-actions { margin: 0 -2px -18px; padding: 12px 2px 18px; }
 }
+
+body { min-height: 100dvh; }
+.dashboard-layout { min-height: 100dvh; }
+
+@media (max-width: 850px) {
+  .platform-layout .sidebar {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 280px;
+    height: 100dvh;
+    padding-top: max(22px, env(safe-area-inset-top));
+    padding-bottom: max(14px, env(safe-area-inset-bottom));
+    transform: translateX(-103%);
+    transition: transform .22s ease;
+  }
+  .platform-layout .sidebar.sidebar-open { transform: translateX(0); }
+  .platform-layout .sidebar-close,
+  .platform-layout .menu-button { display: grid; }
+  .platform-layout .topbar { z-index: 25; }
+  .platform-layout .mobile-overlay { z-index: 9; }
+}
+
+@media (max-width: 650px) {
+  .topbar { padding-right: max(15px, env(safe-area-inset-right)); padding-left: max(15px, env(safe-area-inset-left)); }
+  .platform-layout .topbar { gap: 8px; }
+  .platform-layout .breadcrumbs { min-width: 0; gap: 6px; font-size: 9px; }
+  .platform-layout .breadcrumbs strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .platform-layout .topbar-right { gap: 7px; }
+  .platform-layout .platform-user-label { font-size: 0; }
+  .platform-layout .platform-user-label .live-dot { width: 7px; height: 7px; }
+  .platform-layout .topbar-right > .avatar { display: none; }
+  .menu-button,
+  .icon-button,
+  .button,
+  .nav-item { touch-action: manipulation; }
+  .menu-button,
+  .sidebar-close,
+  .topbar .icon-button { min-width: 44px; min-height: 44px; }
+  .input-wrap input,
+  .plain-input,
+  .field input,
+  .field select,
+  .field textarea,
+  .form-field input,
+  .form-field select,
+  .form-field textarea,
+  .search-control input,
+  .platform-filters select {
+    font-size: 16px;
+  }
+  .modal-actions { flex-wrap: wrap; }
+  .modal-actions .button { min-height: 44px; }
+  .notification-popover { right: 0; width: min(360px, calc(100vw - 24px)); }
+  .timetable-table-wrap,
+  .platform-school-list,
+  .platform-members-list { overscroll-behavior-x: contain; }
+}

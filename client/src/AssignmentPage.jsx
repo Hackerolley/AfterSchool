@@ -105,6 +105,33 @@ export default function AssignmentPage({
     onAssignmentOpened();
   }, [assignments, selectedAssignmentId]);
 
+  useEffect(() => {
+    if (!selected) return;
+    const updatedAssignment = assignments.find((item) => item._id === selected._id);
+    if (updatedAssignment) setSelected(updatedAssignment);
+  }, [assignments, selected?._id]);
+
+  useEffect(() => {
+    if (role !== "teacher" || !selected) return undefined;
+    let active = true;
+    const refreshSubmissions = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const response = await apiGet(`/assignments/${selected._id}/submissions`, organizationId);
+        if (active) setSubmissions(response.data);
+      } catch (requestError) {
+        if (active) setError(requestError.message);
+      }
+    };
+    const interval = window.setInterval(() => void refreshSubmissions(), 45_000);
+    document.addEventListener("visibilitychange", refreshSubmissions);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshSubmissions);
+    };
+  }, [organizationId, role, selected?._id]);
+
   async function createAssignment(event) {
     event.preventDefault();
     setPending(true);

@@ -1,5 +1,6 @@
 const API_URL = (import.meta.env.VITE_API_URL || "/api/v1").replace(/\/$/, "");
 const CSRF_KEY = "afterschool.csrf";
+let csrfTokenRequest;
 
 export class ApiError extends Error {
   constructor(message, status) {
@@ -9,7 +10,8 @@ export class ApiError extends Error {
   }
 }
 
-async function request(path, { method = "GET", body, organizationId, csrfToken } = {}) {
+async function request(path, options = {}, retryCsrf = true) {
+  const { method = "GET", body, organizationId, csrfToken } = options;
   const headers = new Headers({ Accept: "application/json" });
   const isFormData = body instanceof FormData;
   if (body !== undefined && !isFormData) headers.set("Content-Type", "application/json");
@@ -47,6 +49,17 @@ async function request(path, { method = "GET", body, organizationId, csrfToken }
     throw new ApiError(message, response.status);
   }
   if (!response.ok) {
+    if (response.status === 403 && payload.message === "Valid CSRF token required") {
+      if (retryCsrf && csrfToken) {
+        sessionStorage.removeItem(CSRF_KEY);
+        const refreshedToken = await getCsrfToken();
+        return request(path, { ...options, csrfToken: refreshedToken }, false);
+      }
+      throw new ApiError(
+        "Your session security token could not be verified. Reload the app and sign in again if needed. If this continues, check that the app and API can share session cookies.",
+        response.status,
+      );
+    }
     if (
       response.status === 401 &&
       !["/auth/login", "/auth/platform/login", "/auth/csrf"].includes(path)
@@ -59,10 +72,18 @@ async function request(path, { method = "GET", body, organizationId, csrfToken }
 }
 
 export async function getCsrfToken() {
-  const payload = await request("/auth/csrf");
-  const token = payload.data.csrfToken;
-  sessionStorage.setItem(CSRF_KEY, token);
-  return token;
+  if (!csrfTokenRequest) {
+    csrfTokenRequest = request("/auth/csrf")
+      .then((payload) => {
+        const token = payload.data.csrfToken;
+        sessionStorage.setItem(CSRF_KEY, token);
+        return token;
+      })
+      .finally(() => {
+        csrfTokenRequest = undefined;
+      });
+  }
+  return csrfTokenRequest;
 }
 
 async function csrfToken() {

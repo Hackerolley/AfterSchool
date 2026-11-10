@@ -443,6 +443,7 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const hasLoadedData = useRef(false);
   const [data, setData] = useState({ classes: [], archivedClasses: [], courses: [], archivedCourses: [], students: [], inactiveStudents: [], teachers: [], inactiveTeachers: [], assignments: [], attendance: [], library: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -506,7 +507,7 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
 
   useEffect(() => {
     let active = true;
-    setLoading(true);
+    if (!hasLoadedData.current) setLoading(true);
     setError("");
     const jobs = [
       apiGet("/classes?limit=100", orgId),
@@ -552,10 +553,29 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
         if (active) setError(requestError.message);
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) {
+          hasLoadedData.current = true;
+          setLoading(false);
+        }
       });
     return () => { active = false; };
   }, [orgId, role, refreshKey]);
+
+  useEffect(() => {
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        setRefreshKey((value) => value + 1);
+      }
+    };
+    const interval = window.setInterval(refreshWhenVisible, 45_000);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("pageshow", refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("pageshow", refreshWhenVisible);
+    };
+  }, []);
 
   const refresh = () => setRefreshKey((value) => value + 1);
   const openEditDialog = (type, item) => {
@@ -759,7 +779,7 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
           {activePage === "classes" && <ClassesPage role={role} classes={visibleClasses} archivedClasses={data.archivedClasses} loading={loading} search={search} setSearch={setSearch} onCreate={() => setDialog("class")} onEdit={(item) => openEditDialog("class", item)} onStatusChange={(item, status) => updateStatus("class", item, status)} onEnroll={() => setDialog("enroll")} onOpenClass={openClass} />}
           {activePage === "timetable" && <TimetablePage role={role} classes={data.classes} attendance={data.attendance} loading={loading} onConfigure={configureTimetable} onReview={reviewTimetableRequest} onRecordAttendance={(session) => setAttendanceDialog(session)} />}
           {activePage === "courses" && <CoursesPage courses={data.courses} archivedCourses={data.archivedCourses} loading={loading} role={role} onCreate={() => setDialog("course")} onEdit={(item) => openEditDialog("course", item)} onStatusChange={(item, status) => updateStatus("course", item, status)} />}
-          {activePage === "people" && <PeoplePage role={role} data={data} loading={loading} onCreate={(type) => setDialog(type)} onEdit={(type, item) => openEditDialog(`${type}-edit`, item)} onStatusChange={updatePersonStatus} onResetPassword={setPasswordResetPerson} onOpenPerson={openPerson} search={search} setSearch={setSearch} />}
+          {activePage === "people" && <PeoplePage role={role} data={data} loading={loading} onCreate={(type) => setDialog(type)} onEdit={openEditDialog} onStatusChange={updatePersonStatus} onResetPassword={setPasswordResetPerson} onOpenPerson={openPerson} search={search} setSearch={setSearch} />}
           {activePage === "assignments" && <AssignmentPage role={role} assignments={data.assignments} classes={data.classes} loading={loading} organizationId={orgId} onRefresh={refresh} selectedAssignmentId={pendingAssignmentId} onAssignmentOpened={() => setPendingAssignmentId("")} />}
           {activePage === "library" && <LibraryPage role={role} items={data.library} loading={loading} organizationId={orgId} onRefresh={refresh} />}
           {activePage === "quran" && <QuranPage organizationId={orgId} studentName={fullName(person)} />}
@@ -1226,6 +1246,7 @@ function PeoplePage({ role, data, loading, onCreate, onEdit, onStatusChange, onR
 }
 
 function PlatformDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout }) {
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [dialog, setDialog] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [editingOrganization, setEditingOrganization] = useState(null);
@@ -1248,11 +1269,43 @@ function PlatformDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogo
   const [memberPage, setMemberPage] = useState(1);
   const [memberPagination, setMemberPagination] = useState({ page: 1, pages: 0, total: 0 });
   const [refreshKey, setRefreshKey] = useState(0);
+  const hasLoadedSchools = useRef(false);
+  const loadedMembershipSchoolId = useRef("");
+
+  useEffect(() => {
+    if (!mobileNavOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") setMobileNavOpen(false);
+    };
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [mobileNavOpen]);
+
+  useEffect(() => {
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        setRefreshKey((value) => value + 1);
+      }
+    };
+    const interval = window.setInterval(refreshWhenVisible, 45_000);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("pageshow", refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("pageshow", refreshWhenVisible);
+    };
+  }, []);
 
   useEffect(() => {
     let current = true;
     const timer = window.setTimeout(async () => {
-      setSchoolsLoading(true);
+      if (!hasLoadedSchools.current) setSchoolsLoading(true);
       setError("");
       const query = new URLSearchParams({ page: String(schoolPage), limit: "10" });
       if (schoolSearch.trim()) query.set("search", schoolSearch.trim());
@@ -1266,7 +1319,10 @@ function PlatformDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogo
       } catch (requestError) {
         if (current) setError(requestError.message);
       } finally {
-        if (current) setSchoolsLoading(false);
+        if (current) {
+          hasLoadedSchools.current = true;
+          setSchoolsLoading(false);
+        }
       }
     }, 180);
     return () => {
@@ -1279,10 +1335,13 @@ function PlatformDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogo
     if (!selectedSchoolId) {
       setSchoolDetails(null);
       setMembers([]);
+      setMembersLoading(false);
+      loadedMembershipSchoolId.current = "";
       return undefined;
     }
     let current = true;
-    setMembersLoading(true);
+    const showLoading = loadedMembershipSchoolId.current !== selectedSchoolId;
+    if (showLoading) setMembersLoading(true);
     const query = new URLSearchParams({ page: String(memberPage), limit: "10" });
     if (memberSearch.trim()) query.set("search", memberSearch.trim());
     if (memberStatus) query.set("status", memberStatus);
@@ -1296,12 +1355,13 @@ function PlatformDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogo
         setSchoolDetails(schoolResult.data);
         setMembers(membershipResult.data);
         setMemberPagination(membershipResult.pagination);
+        loadedMembershipSchoolId.current = selectedSchoolId;
       })
       .catch((requestError) => {
         if (current) setError(requestError.message);
       })
       .finally(() => {
-        if (current) setMembersLoading(false);
+        if (current && showLoading) setMembersLoading(false);
       });
     return () => {
       current = false;
@@ -1386,15 +1446,16 @@ function PlatformDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogo
   }
   return (
     <div className="dashboard-layout platform-layout">
-      <aside className="sidebar">
-        <div className="sidebar-brand"><Brand /></div>
+      <aside className={`sidebar ${mobileNavOpen ? "sidebar-open" : ""}`}>
+        <div className="sidebar-brand"><Brand /><button className="icon-button sidebar-close" aria-label="Close navigation" onClick={() => setMobileNavOpen(false)}><X size={18} /></button></div>
         <div className="platform-tag"><ShieldCheck size={15} /> PLATFORM CONSOLE</div>
         <p className="nav-label">MANAGE</p>
         <nav className="side-nav"><button className="nav-item nav-active"><Building2 size={18} /><span>Schools & memberships</span></button></nav>
-        <div className="sidebar-bottom"><button className="nav-item settings-item" onClick={() => setSettingsOpen(true)}><Settings2 size={18} /><span>Settings</span></button><div className="sidebar-user"><Avatar user={auth.user} className="avatar avatar-dark" /><div className="sidebar-user-copy"><strong>{fullName(auth.user)}</strong><span>Platform admin</span></div><button className="icon-button logout-icon" title="Sign out" aria-label="Sign out" onClick={onLogout}><LogOut size={17} /></button></div></div>
+        <div className="sidebar-bottom"><button className="nav-item settings-item" onClick={() => { setSettingsOpen(true); setMobileNavOpen(false); }}><Settings2 size={18} /><span>Settings</span></button><div className="sidebar-user"><Avatar user={auth.user} className="avatar avatar-dark" /><div className="sidebar-user-copy"><strong>{fullName(auth.user)}</strong><span>Platform admin</span></div><button className="icon-button logout-icon" title="Sign out" aria-label="Sign out" onClick={onLogout}><LogOut size={17} /></button></div></div>
       </aside>
+      {mobileNavOpen && <button className="mobile-overlay" aria-label="Close navigation overlay" onClick={() => setMobileNavOpen(false)} />}
       <main className="main-panel">
-        <header className="topbar"><div className="breadcrumbs"><span>Platform</span><span className="crumb-divider">/</span><strong>School management</strong></div><div className="topbar-right"><span className="platform-user-label"><span className="live-dot" />Platform access</span><span className="topbar-separator" /><Avatar user={auth.user} className="avatar avatar-soft" /></div></header>
+        <header className="topbar"><button className="icon-button menu-button" aria-label="Open navigation" aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(true)}><Menu size={20} /></button><div className="breadcrumbs"><span>Platform</span><span className="crumb-divider">/</span><strong>School management</strong></div><div className="topbar-right"><span className="platform-user-label"><span className="live-dot" />Platform access</span><span className="topbar-separator" /><Avatar user={auth.user} className="avatar avatar-soft" /></div></header>
         <div className="dashboard-content platform-content">
           <div className="welcome-row"><div><p className="eyebrow">PLATFORM CONSOLE</p><h1>School management</h1><p className="muted welcome-subtitle">Manage school access and memberships from one place.</p></div><button className="button button-primary" onClick={() => setDialog(true)}><Plus size={17} />Create a school</button></div>
           {notice && <div className="notice-banner"><Check size={17} />{notice}<button aria-label="Dismiss notification" onClick={() => setNotice("")}><X size={16} /></button></div>}
@@ -1689,6 +1750,20 @@ function ActionDialog({ type, initialItem = null, initialClassId = "", courses =
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [onClose, pending]);
+
+  if (!config) {
+    return (
+      <div className="modal-backdrop">
+        <section className="modal action-dialog" role="alertdialog" aria-modal="true" aria-labelledby="dialog-error-title">
+          <div className="modal-heading">
+            <div><p className="eyebrow">SCHOOL WORKSPACE</p><h2 id="dialog-error-title">Form unavailable</h2><p>This form could not be opened.</p></div>
+            <button className="icon-button modal-close" type="button" aria-label="Close dialog" onClick={onClose}><X size={19} /></button>
+          </div>
+          <div className="modal-actions"><button className="button button-primary" type="button" onClick={onClose}>Close</button></div>
+        </section>
+      </div>
+    );
+  }
 
   async function submit(event) {
     event.preventDefault();
