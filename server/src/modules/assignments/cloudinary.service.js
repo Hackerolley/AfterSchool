@@ -1,8 +1,16 @@
 import { v2 as cloudinary } from "cloudinary";
+import { randomUUID } from "node:crypto";
+import { extname } from "node:path";
 import { Readable } from "node:stream";
 import { HttpError } from "../../utils/http-error.js";
 
 let configured = false;
+
+function rawDocumentPublicId(publicId, format) {
+  const extension = String(format || "").replace(/^\./, "").toLowerCase();
+  if (!extension || publicId.toLowerCase().endsWith(`.${extension}`)) return publicId;
+  return `${publicId}.${extension}`;
+}
 
 function getCloudinaryErrorMessage(error, config) {
   const providerError = error?.error ?? error;
@@ -84,12 +92,16 @@ export async function deleteImage(publicId, config) {
 
 export async function uploadDocument(file, organizationId, config) {
   const client = getCloudinary(config);
+  const extension = extname(file.originalname).toLowerCase();
+  const documentId = `${randomUUID()}${extension}`;
   const upload = new Promise((resolve, reject) => {
     const stream = client.uploader.upload_stream(
       {
         resource_type: "raw",
         type: "authenticated",
         folder: `afterschool/${organizationId}`,
+        public_id: documentId,
+        filename: documentId,
         use_filename: false,
         unique_filename: true,
       },
@@ -109,10 +121,11 @@ export async function uploadDocument(file, organizationId, config) {
       "The document could not be stored. Please try again.",
     );
   }
+  const format = asset.format || extension.slice(1) || "bin";
   return {
-    publicId: asset.public_id,
+    publicId: rawDocumentPublicId(asset.public_id, format),
     originalFilename: file.originalname.replace(/[^\w.\- ()]/g, "_").slice(0, 180),
-    format: asset.format || file.originalname.split(".").pop()?.toLowerCase() || "bin",
+    format,
     bytes: asset.bytes,
   };
 }
@@ -156,7 +169,7 @@ export async function deleteDocument(attachment, config) {
   if (!attachment?.publicId) return;
   const client = getCloudinary(config);
   try {
-    await client.uploader.destroy(attachment.publicId, {
+    await client.uploader.destroy(rawDocumentPublicId(attachment.publicId, attachment.format), {
       resource_type: "raw",
       type: "authenticated",
       invalidate: true,
@@ -182,12 +195,16 @@ export async function deleteVideo(attachment, config) {
 
 export function privateDocumentUrl(attachment, config) {
   const client = getCloudinary(config);
-  return client.utils.private_download_url(attachment.publicId, attachment.format, {
-    resource_type: "raw",
-    type: "authenticated",
-    attachment: attachment.originalFilename,
-    expires_at: Math.floor(Date.now() / 1000) + 300,
-  });
+  return client.utils.private_download_url(
+    rawDocumentPublicId(attachment.publicId, attachment.format),
+    attachment.format,
+    {
+      resource_type: "raw",
+      type: "authenticated",
+      attachment: attachment.originalFilename,
+      expires_at: Math.floor(Date.now() / 1000) + 300,
+    },
+  );
 }
 
 export function privateVideoUrl(attachment, config) {

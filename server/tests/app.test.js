@@ -106,6 +106,7 @@ test("private assignment document URLs use authenticated, expiring Cloudinary do
   assert.equal(url.hostname, "api.cloudinary.com");
   assert.match(url.pathname, /\/download$/);
   assert.equal(url.searchParams.get("type"), "authenticated");
+  assert.equal(url.searchParams.get("public_id"), "afterschool/example/reading.pdf");
   const expiresAt = Number(url.searchParams.get("expires_at"));
   assert.ok(expiresAt >= before + 300 && expiresAt <= before + 301);
   assert.equal(url.searchParams.get("attachment"), "reading.pdf");

@@ -21,7 +21,7 @@ async function request(path, options = {}, retryCsrf = true) {
   if (csrfToken) headers.set("X-CSRF-Token", csrfToken);
 
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 30_000);
+  const timeout = window.setTimeout(() => controller.abort(), isFormData ? 120_000 : 30_000);
   let response;
   try {
     response = await fetch(`${API_URL}${path}`, {
@@ -45,7 +45,9 @@ async function request(path, options = {}, retryCsrf = true) {
     ? await response.json().catch(() => null)
     : null;
   if (!payload) {
-    const message = response.status >= 500
+    const message = response.status === 413
+      ? "The file is too large for the upload service. Choose a smaller file and try again."
+      : response.status >= 500
       ? `The server couldn't complete this request (${response.status}). Please try again.`
       : "The server returned an unexpected response.";
     throw new ApiError(message, response.status);
