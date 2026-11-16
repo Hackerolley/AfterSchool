@@ -8,11 +8,15 @@ import {
   removeSchoolLogo,
   updateProfileAvatar,
   updateSchoolMemberIdFormats,
+  updateSchoolTimeZone,
   updateSchoolLogo,
 } from "./settings.controller.js";
 import { uploadSettingsImage } from "./settings.upload.js";
 import { validate } from "../../middleware/validate.js";
-import { updateMemberIdFormatsSchema } from "../organizations/organization.validator.js";
+import {
+  updateMemberIdFormatsSchema,
+  updateOrganizationTimeZoneSchema,
+} from "../organizations/organization.validator.js";
 
 const router = Router();
 router.get("/profile", authenticate, asyncHandler(getProfileSettings));
@@ -25,6 +29,12 @@ router.patch(
   authorize("admin"),
   validate(updateMemberIdFormatsSchema),
   asyncHandler(updateSchoolMemberIdFormats),
+);
+router.patch(
+  "/school/time-zone",
+  authorize("admin"),
+  validate(updateOrganizationTimeZoneSchema),
+  asyncHandler(updateSchoolTimeZone),
 );
 router.post("/school/logo", authorize("admin"), uploadSettingsImage, asyncHandler(updateSchoolLogo));
 router.delete("/school/logo", authorize("admin"), asyncHandler(removeSchoolLogo));

@@ -13,6 +13,7 @@ import {
   listOrganizationsQuerySchema,
   updateMemberIdFormatsSchema,
   updateOrganizationSchema,
+  updateOrganizationTimeZoneSchema,
   updatePlatformMembershipStatusSchema,
 } from "../src/modules/organizations/organization.validator.js";
 import {
@@ -47,6 +48,12 @@ import { updateProgressSchema } from "../src/modules/quran/quran.validator.js";
 import { clearQuranTokenCache, fetchQuranContent } from "../src/modules/quran/quran.service.js";
 import { isSupportedImage } from "../src/modules/settings/settings.upload.js";
 import { formatMemberId } from "../src/modules/users/user-id.js";
+import {
+  isLocalDateTimeAtOrBefore,
+  isValidTimeZone,
+  localDateTimeInZone,
+  weekdayForDate,
+} from "../src/utils/time-zone.js";
 
 function makeApp(configOverrides = {}) {
   return createApp({
@@ -85,6 +92,23 @@ test("school ID formats validate and generate dated sequential identifiers", () 
     student: "ST-{DD}{MM}{YY}",
     teacher: "IN-{SEQ}",
   }).success, false);
+});
+
+test("school time zones validate and attendance uses the school's local clock", () => {
+  assert.equal(updateOrganizationTimeZoneSchema.safeParse({ timeZone: "Africa/Cairo" }).success, true);
+  assert.equal(updateOrganizationTimeZoneSchema.safeParse({ timeZone: "Not/A_Timezone" }).success, false);
+  assert.equal(isValidTimeZone("UTC"), true);
+  assert.equal(weekdayForDate("2026-11-12"), 4);
+
+  const beforeClassEnds = new Date("2026-11-12T14:59:00.000Z");
+  const afterClassEnds = new Date("2026-11-12T15:00:00.000Z");
+  assert.deepEqual(localDateTimeInZone(afterClassEnds, "Africa/Cairo"), {
+    date: "2026-11-12",
+    time: "17:00",
+  });
+  assert.equal(isLocalDateTimeAtOrBefore("2026-11-12", "17:00", "Africa/Cairo", beforeClassEnds), false);
+  assert.equal(isLocalDateTimeAtOrBefore("2026-11-12", "17:00", "Africa/Cairo", afterClassEnds), true);
+  assert.equal(isLocalDateTimeAtOrBefore("2026-11-11", "23:59", "Africa/Cairo", beforeClassEnds), true);
 });
 
 test("private assignment document URLs use authenticated, expiring Cloudinary downloads", () => {
@@ -578,6 +602,10 @@ test("class progress and attendance validate monthly grades and unique student e
     sessionDate: "2026-03-15",
     records: [{ studentMembershipId: id, status: "present" }],
   }).success, true);
+  assert.equal(updateStudentAttendanceSchema.safeParse({
+    sessionDate: "2026-02-30",
+    records: [{ studentMembershipId: id, status: "present" }],
+  }).success, false);
   assert.equal(updateStudentAttendanceSchema.safeParse({
     sessionDate: "2026-03-15",
     records: [

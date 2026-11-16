@@ -77,7 +77,7 @@ export const updateStudentAttendanceSchema = z.object({
     const date = new Date(`${value}T00:00:00.000Z`);
     return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
   }, "Enter a valid session date"),
-  records: z.array(attendanceEntrySchema).min(1).max(100),
+  records: z.array(attendanceEntrySchema).min(1).max(1000),
 }).strict().superRefine(({ records }, context) => {
   const seen = new Set();
   records.forEach((record, index) => {

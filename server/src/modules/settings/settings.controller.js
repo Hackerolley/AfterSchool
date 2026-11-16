@@ -48,12 +48,21 @@ export function getSchoolSettings(req, res) {
       name: req.organization.name,
       slug: req.organization.slug,
       logoUrl: req.organization.logoUrl || "",
+      timeZone: req.organization.timeZone || "UTC",
       idFormats: {
         student: req.organization.idFormats?.student || DEFAULT_MEMBER_ID_FORMATS.student,
         teacher: req.organization.idFormats?.teacher || DEFAULT_MEMBER_ID_FORMATS.teacher,
       },
     },
   });
+}
+
+export async function updateSchoolTimeZone(req, res) {
+  const organization = await Organization.findById(req.organization._id);
+  if (!organization) throw new HttpError(404, "School not found");
+  organization.timeZone = req.body.timeZone;
+  await organization.save();
+  res.json({ success: true, data: { timeZone: organization.timeZone } });
 }
 
 export async function updateSchoolMemberIdFormats(req, res) {

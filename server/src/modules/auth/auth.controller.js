@@ -26,14 +26,14 @@ export async function login(req, res) {
   const organization = await Organization.findOne({
     ...(organizationId ? { _id: organizationId } : { slug: organizationSlug }),
     status: "active",
-  }).select("_id name slug logoUrl");
+  }).select("_id name slug logoUrl timeZone");
   if (!organization) throw new HttpError(401, "Invalid email or password");
 
   const membership = await Membership.findOne({
     user: user._id,
     organization: organization._id,
     status: "active",
-  }).populate("organization", "name slug status logoUrl");
+  }).populate("organization", "name slug status logoUrl timeZone");
   if (!membership || membership.organization.status !== "active") {
     throw new HttpError(401, "Invalid email or password");
   }
@@ -52,6 +52,7 @@ export async function login(req, res) {
         name: membership.organization.name,
         slug: membership.organization.slug,
         logoUrl: membership.organization.logoUrl,
+        timeZone: membership.organization.timeZone || "UTC",
       },
       role: membership.role,
       mustChangePassword: membership.mustChangePassword,
@@ -133,6 +134,7 @@ export function me(req, res) {
         name: req.organization.name,
         slug: req.organization.slug,
         logoUrl: req.organization.logoUrl,
+        timeZone: req.organization.timeZone || "UTC",
       },
       role: req.membership.role,
       mustChangePassword: req.membership.mustChangePassword,

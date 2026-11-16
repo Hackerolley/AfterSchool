@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { extname } from "node:path";
 import { Assignment, AssignmentSubmission } from "../assignments/assignment.model.js";
 import { deleteDocument, deleteVideo, privateDocumentUrl, privateVideoUrl, uploadDocument, uploadVideo } from "../assignments/cloudinary.service.js";
@@ -11,6 +12,7 @@ import { getVisibleClass } from "./class.controller.js";
 import { createProgressReportPdf } from "./progress-report.pdf.js";
 import { HttpError } from "../../utils/http-error.js";
 import { notifyMemberships } from "../notifications/notification.service.js";
+import { isLocalDateTimeAtOrBefore, localDateTimeInZone, weekdayForDate } from "../../utils/time-zone.js";
 
 function safeResource(resource) {
   const value = resource.toObject ? resource.toObject() : resource;
@@ -260,40 +262,66 @@ export async function updateStudentProgress(req, res) {
 
 export async function updateStudentAttendance(req, res) {
   const schoolClass = await requireEditableClass(req);
-  if (req.body.sessionDate > new Date().toISOString().slice(0, 10)) {
+  const timeZone = req.organization.timeZone || "UTC";
+  const now = new Date();
+  const currentDate = localDateTimeInZone(now, timeZone).date;
+  if (req.body.sessionDate > currentDate) {
     throw new HttpError(400, "Attendance cannot be recorded for a future date");
   }
-  const studentIds = req.body.records.map((record) => record.studentMembershipId);
-  const enrollments = await Enrollment.find({
-    organization: req.organization._id,
-    class: schoolClass._id,
-    student: { $in: studentIds },
-    status: "active",
-  }).distinct("student");
-  if (enrollments.length !== studentIds.length) {
-    throw new HttpError(400, "Attendance can only be recorded for active students in this class");
+  const scheduledSessions = schoolClass.timetable.filter(
+    (slot) => slot.dayOfWeek === weekdayForDate(req.body.sessionDate),
+  );
+  if (!scheduledSessions.length) {
+    throw new HttpError(400, "Attendance can only be recorded on a scheduled class day");
+  }
+  if (!scheduledSessions.every((slot) => (
+    isLocalDateTimeAtOrBefore(req.body.sessionDate, slot.endTime, timeZone, now)
+  ))) {
+    throw new HttpError(400, "Attendance can only be recorded after all scheduled sessions have ended");
   }
 
-  await StudentAttendance.bulkWrite(req.body.records.map(({ studentMembershipId, status }) => ({
-    updateOne: {
-      filter: {
+  const studentIds = req.body.records.map((record) => record.studentMembershipId);
+  const activeStudentIds = await Enrollment.find({
+    organization: req.organization._id,
+    class: schoolClass._id,
+    status: "active",
+  }).distinct("student");
+  const activeStudents = new Set(activeStudentIds.map((studentId) => studentId.toString()));
+  if (
+    activeStudents.size !== studentIds.length
+    || studentIds.some((studentId) => !activeStudents.has(studentId))
+  ) {
+    throw new HttpError(400, "Include every active student in this class when recording attendance");
+  }
+
+  const attendanceRecords = req.body.records.map(({ studentMembershipId, status }) => ({
+    organization: req.organization._id,
+    class: schoolClass._id,
+    student: studentMembershipId,
+    sessionDate: req.body.sessionDate,
+    status,
+    markedBy: req.membership._id,
+  }));
+  const databaseSession = await mongoose.startSession();
+  try {
+    await databaseSession.withTransaction(async () => {
+      if (await StudentAttendance.exists({
         organization: req.organization._id,
         class: schoolClass._id,
-        student: studentMembershipId,
         sessionDate: req.body.sessionDate,
-      },
-      update: {
-        $set: { status, markedBy: req.membership._id },
-        $setOnInsert: {
-          organization: req.organization._id,
-          class: schoolClass._id,
-          student: studentMembershipId,
-          sessionDate: req.body.sessionDate,
-        },
-      },
-      upsert: true,
-    },
-  })));
+      }).session(databaseSession)) {
+        throw new HttpError(409, "Attendance has already been recorded for this class session");
+      }
+      await StudentAttendance.insertMany(attendanceRecords, { session: databaseSession });
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      throw new HttpError(409, "Attendance has already been recorded for one or more students in this session");
+    }
+    throw error;
+  } finally {
+    await databaseSession.endSession();
+  }
   await Promise.all(req.body.records.map(({ studentMembershipId, status }) => notifyMemberships({
     organization: req.organization._id,
     recipients: [studentMembershipId],

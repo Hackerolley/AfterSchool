@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidTimeZone } from "../../utils/time-zone.js";
 
 const memberIdFormatSchema = z.string()
   .trim()
@@ -14,6 +15,10 @@ const memberIdFormatSchema = z.string()
 export const updateMemberIdFormatsSchema = z.object({
   student: memberIdFormatSchema,
   teacher: memberIdFormatSchema,
+}).strict();
+
+export const updateOrganizationTimeZoneSchema = z.object({
+  timeZone: z.string().trim().min(1).max(100).refine(isValidTimeZone, "Enter a valid IANA time zone"),
 }).strict();
 
 export const createOrganizationSchema = z.object({

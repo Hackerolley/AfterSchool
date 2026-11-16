@@ -7,6 +7,7 @@ import { User } from "../users/user.model.js";
 import { HttpError } from "../../utils/http-error.js";
 import { paginationResult } from "../../utils/pagination.js";
 import { notifyMemberships } from "../notifications/notification.service.js";
+import { isLocalDateTimeAtOrBefore, weekdayForDate } from "../../utils/time-zone.js";
 
 async function classMemberRecipients(organizationId, schoolClass, { includeTeacher = true } = {}) {
   const students = await Enrollment.find({
@@ -71,10 +72,30 @@ export async function recordClassAttendance(req, res) {
     organization: req.organization._id,
     status: "active",
     ...(req.membership.role === "teacher" ? { teacher: req.membership._id } : {}),
-  }).select("_id name teacher");
+  }).select("_id name teacher timetable");
   if (!schoolClass) throw new HttpError(404, "Assigned active class not found");
 
   const { action, ...session } = req.body;
+  const scheduledSession = schoolClass.timetable.some((slot) => (
+    slot.dayOfWeek === weekdayForDate(session.sessionDate)
+    && slot.startTime === session.startTime
+    && slot.endTime === session.endTime
+  ));
+  if (!scheduledSession) {
+    throw new HttpError(400, "Attendance must match a scheduled class session");
+  }
+  const timeZone = req.organization.timeZone || "UTC";
+  const now = new Date();
+  if (!isLocalDateTimeAtOrBefore(session.sessionDate, session.endTime, timeZone, now)) {
+    throw new HttpError(400, "Attendance can only be recorded after the scheduled class has ended");
+  }
+  if (
+    action === "rescheduled"
+    && isLocalDateTimeAtOrBefore(req.body.rescheduledDate, req.body.rescheduledStartTime, timeZone, now)
+  ) {
+    throw new HttpError(400, "Choose a future date and time for the rescheduled class");
+  }
+
   const update = {
     status: action,
     endTime: session.endTime,
@@ -88,24 +109,21 @@ export async function recordClassAttendance(req, res) {
     update.rescheduledEndTime = session.rescheduledEndTime;
   }
 
-  const attendance = await ClassAttendance.findOneAndUpdate(
-    {
+  let attendance;
+  try {
+    [attendance] = await ClassAttendance.create([{
       organization: req.organization._id,
       class: schoolClass._id,
       sessionDate: session.sessionDate,
       startTime: session.startTime,
-    },
-    {
-      $set: update,
-      $setOnInsert: {
-        organization: req.organization._id,
-        class: schoolClass._id,
-        sessionDate: session.sessionDate,
-        startTime: session.startTime,
-      },
-    },
-    { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true },
-  );
+      ...update,
+    }]);
+  } catch (error) {
+    if (error.code === 11000) {
+      throw new HttpError(409, "Attendance has already been recorded for this class session");
+    }
+    throw error;
+  }
   const recipients = await classMemberRecipients(req.organization._id, schoolClass, {
     includeTeacher: schoolClass.teacher.toString() !== req.membership._id.toString(),
   });

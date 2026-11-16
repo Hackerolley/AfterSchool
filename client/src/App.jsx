@@ -177,6 +177,7 @@ function App() {
         slug: data.organization.slug,
         name: data.organization.name,
         logoUrl: data.organization.logoUrl || "",
+        timeZone: data.organization.timeZone || "UTC",
       };
       localStorage.setItem(SCHOOL_KEY, JSON.stringify(school));
       nextAuth.school = school;
@@ -236,6 +237,7 @@ function SettingsDialog({ auth, onAuthChange, darkMode, onToggleTheme, organizat
     student: "ST-{DD}{MM}{YY}{SEQ:3}",
     teacher: "IN-{DD}{MM}{YY}{SEQ:3}",
   });
+  const [schoolTimeZone, setSchoolTimeZone] = useState("UTC");
 
   useEffect(() => {
     if (!canManageLogo) return;
@@ -243,6 +245,7 @@ function SettingsDialog({ auth, onAuthChange, darkMode, onToggleTheme, organizat
     apiGet("/settings/school", organizationId)
       .then((response) => {
         if (active && response.data.idFormats) setIdFormats(response.data.idFormats);
+        if (active) setSchoolTimeZone(response.data.timeZone || "UTC");
       })
       .catch((requestError) => {
         if (active) setError(requestError.message);
@@ -259,6 +262,31 @@ function SettingsDialog({ auth, onAuthChange, darkMode, onToggleTheme, organizat
       const response = await apiPatch("/settings/school/id-formats", idFormats, organizationId);
       setIdFormats(response.data.idFormats);
       setNotice("Student and teacher ID formats updated.");
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setSaving("");
+    }
+  }
+
+  async function saveSchoolTimeZone(event) {
+    event.preventDefault();
+    setSaving("time-zone");
+    setError("");
+    setNotice("");
+    try {
+      const response = await apiPatch(
+        "/settings/school/time-zone",
+        { timeZone: schoolTimeZone },
+        organizationId,
+      );
+      setSchoolTimeZone(response.data.timeZone);
+      onAuthChange((current) => {
+        const school = { ...current.school, timeZone: response.data.timeZone };
+        localStorage.setItem(SCHOOL_KEY, JSON.stringify(school));
+        return { ...current, school };
+      });
+      setNotice("School time zone updated.");
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -350,6 +378,11 @@ function SettingsDialog({ auth, onAuthChange, darkMode, onToggleTheme, organizat
             <label><span>Student ID format</span><input required maxLength="40" value={idFormats.student} onChange={(event) => setIdFormats((current) => ({ ...current, student: event.target.value }))} /></label>
             <label><span>Teacher ID format</span><input required maxLength="40" value={idFormats.teacher} onChange={(event) => setIdFormats((current) => ({ ...current, teacher: event.target.value }))} /></label>
             <button className="button button-primary button-small" type="submit" disabled={saving === "id-formats"}>{saving === "id-formats" ? "Saving…" : "Save ID formats"}</button>
+          </form>}
+          {canManageLogo && <form className="settings-id-formats" onSubmit={saveSchoolTimeZone}>
+            <div><strong>School time zone</strong><p>Used to determine the local day and end time for attendance. Enter an IANA time zone such as Africa/Cairo or America/New_York.</p></div>
+            <label><span>Time zone</span><input required maxLength="100" value={schoolTimeZone} onChange={(event) => setSchoolTimeZone(event.target.value)} /></label>
+            <button className="button button-primary button-small" type="submit" disabled={saving === "time-zone"}>{saving === "time-zone" ? "Saving…" : "Save time zone"}</button>
           </form>}
           <section className="settings-row">
             <div className="settings-identity"><span className="settings-theme-icon">{darkMode ? <Moon size={18} /> : <Sun size={18} />}</span><div><strong>Night mode</strong><span>Use a darker appearance on this device</span></div></div>
@@ -777,7 +810,7 @@ function SchoolDashboard({ auth, onAuthChange, darkMode, onToggleTheme, onLogout
 
           {activePage === "overview" && <Overview role={role} data={data} loading={loading} onNavigate={setActivePage} onEnroll={() => setDialog("enroll")} onOpenClass={openClass} />}
           {activePage === "classes" && <ClassesPage role={role} classes={visibleClasses} archivedClasses={data.archivedClasses} loading={loading} search={search} setSearch={setSearch} onCreate={() => setDialog("class")} onEdit={(item) => openEditDialog("class", item)} onStatusChange={(item, status) => updateStatus("class", item, status)} onEnroll={() => setDialog("enroll")} onOpenClass={openClass} />}
-          {activePage === "timetable" && <TimetablePage role={role} classes={data.classes} attendance={data.attendance} loading={loading} onConfigure={configureTimetable} onReview={reviewTimetableRequest} onRecordAttendance={(session) => setAttendanceDialog(session)} />}
+          {activePage === "timetable" && <TimetablePage role={role} classes={data.classes} attendance={data.attendance} timeZone={auth.school.timeZone || "UTC"} loading={loading} onConfigure={configureTimetable} onReview={reviewTimetableRequest} onRecordAttendance={(session) => setAttendanceDialog(session)} />}
           {activePage === "courses" && <CoursesPage courses={data.courses} archivedCourses={data.archivedCourses} loading={loading} role={role} onCreate={() => setDialog("course")} onEdit={(item) => openEditDialog("course", item)} onStatusChange={(item, status) => updateStatus("course", item, status)} />}
           {activePage === "people" && <PeoplePage role={role} data={data} loading={loading} onCreate={(type) => setDialog(type)} onEdit={openEditDialog} onStatusChange={updatePersonStatus} onResetPassword={setPasswordResetPerson} onOpenPerson={openPerson} search={search} setSearch={setSearch} />}
           {activePage === "assignments" && <AssignmentPage role={role} assignments={data.assignments} classes={data.classes} loading={loading} organizationId={orgId} onRefresh={refresh} selectedAssignmentId={pendingAssignmentId} onAssignmentOpened={() => setPendingAssignmentId("")} />}
@@ -874,7 +907,7 @@ function ClassCard({ schoolClass, index, onOpen }) {
 
 const weekDays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-function TimetablePage({ role, classes, attendance, loading, onConfigure, onReview, onRecordAttendance }) {
+function TimetablePage({ role, classes, attendance, timeZone, loading, onConfigure, onReview, onRecordAttendance }) {
   const [now, setNow] = useState(() => new Date());
   const entries = classes.flatMap((schoolClass) => (schoolClass.timetable || []).map((slot) => ({
     ...slot,
@@ -945,6 +978,7 @@ function TimetablePage({ role, classes, attendance, loading, onConfigure, onRevi
                 <TimetableSessionRow
                   key={`${schoolClass._id}-${dayOfWeek}-${startTime}-${index}`}
                   role={role}
+                  timeZone={timeZone}
                   schoolClass={schoolClass}
                   dayOfWeek={dayOfWeek}
                   startTime={startTime}
@@ -999,21 +1033,66 @@ function dateKey(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function nextSessionOccurrence(dayOfWeek, startTime, endTime, now) {
-  const daysUntilClass = (dayOfWeek - now.getDay() + 7) % 7;
-  const date = new Date(now);
-  date.setDate(date.getDate() + daysUntilClass);
-  const [startHour, startMinute] = startTime.split(":").map(Number);
-  const [endHour, endMinute] = endTime.split(":").map(Number);
-  date.setHours(startHour, startMinute, 0, 0);
-  const end = new Date(date);
-  end.setHours(endHour, endMinute, 0, 0);
-  if (now >= end) date.setDate(date.getDate() + 7);
-  return dateKey(date);
+function dateTimeInZone(date, timeZone) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return {
+    date: `${values.year}-${values.month}-${values.day}`,
+    time: `${values.hour}:${values.minute}`,
+  };
+}
+
+function weekdayForDate(date) {
+  const [year, month, day] = date.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+}
+
+function addDaysToDate(date, days) {
+  const [year, month, day] = date.split("-").map(Number);
+  const result = new Date(Date.UTC(year, month - 1, day + days));
+  return `${result.getUTCFullYear()}-${String(result.getUTCMonth() + 1).padStart(2, "0")}-${String(result.getUTCDate()).padStart(2, "0")}`;
+}
+
+function sessionHasEnded(date, endTime, now, timeZone) {
+  const current = dateTimeInZone(now, timeZone);
+  return date < current.date || (date === current.date && endTime <= current.time);
+}
+
+function attendanceSessionDate(dayOfWeek, endTime, now, timeZone, attendance, classId, startTime) {
+  const current = dateTimeInZone(now, timeZone);
+  const currentWeekday = weekdayForDate(current.date);
+  const mostRecentDate = addDaysToDate(
+    current.date,
+    -((currentWeekday - dayOfWeek + 7) % 7),
+  );
+  const mostRecentRecord = attendance.get(`${classId}:${mostRecentDate}:${startTime}`);
+  if (
+    sessionHasEnded(mostRecentDate, endTime, now, timeZone)
+    && !mostRecentRecord
+  ) {
+    return mostRecentDate;
+  }
+  let nextDate = addDaysToDate(
+    current.date,
+    (dayOfWeek - currentWeekday + 7) % 7,
+  );
+  if (sessionHasEnded(nextDate, endTime, now, timeZone)) {
+    nextDate = addDaysToDate(nextDate, 7);
+  }
+  return nextDate;
 }
 
 function TimetableSessionRow({
   role,
+  timeZone,
   schoolClass,
   dayOfWeek,
   startTime,
@@ -1025,8 +1104,17 @@ function TimetableSessionRow({
   onRecordAttendance,
   onConfigure,
 }) {
-  const sessionDate = nextSessionOccurrence(dayOfWeek, startTime, endTime, now);
+  const sessionDate = attendanceSessionDate(
+    dayOfWeek,
+    endTime,
+    now,
+    timeZone,
+    attendance,
+    schoolClass._id,
+    startTime,
+  );
   const record = attendance.get(`${schoolClass._id}:${sessionDate}:${startTime}`);
+  const sessionEnded = sessionHasEnded(sessionDate, endTime, now, timeZone);
   const session = { classId: schoolClass._id, sessionDate, startTime, endTime };
   const sessionDateLabel = new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric" })
     .format(new Date(`${sessionDate}T00:00:00`));
@@ -1057,7 +1145,7 @@ function TimetableSessionRow({
       <td>
         {(role === "admin" || role === "teacher") && (
           <div className="attendance-actions">
-            <button className="button button-quiet button-small" onClick={() => onRecordAttendance(session)}>Record attendance</button>
+            <button className="button button-quiet button-small" disabled={!sessionEnded || Boolean(record)} onClick={() => onRecordAttendance(session)}>{sessionEnded ? "Record attendance" : "Available after class ends"}</button>
             <button className="text-button timetable-edit" onClick={() => onConfigure(schoolClass._id)}>{role === "teacher" ? "Request change" : "Edit schedule"}</button>
           </div>
         )}
